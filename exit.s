@@ -5,5 +5,5 @@
 _start:
 	movl $1, %eax
 	movl $3, %ebx
-	#int $0x80
+	int $0x80
 
