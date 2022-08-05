@@ -30,4 +30,3 @@ _start:
 	pushl $0
 	call exit
 
-
