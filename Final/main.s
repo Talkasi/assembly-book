@@ -1,39 +1,25 @@
+.include "definitions.s"
 .section .data
+
 hi_line:
 	.ascii "\nWelcome to the TasiApp!\n\n\0"
+hi_line_end:
+.equ hi_line_len, hi_line_end - hi_line
 
 ask_user:
 	.ascii "\nTyping line: \0"
+ask_user_end:
+.equ ask_user_len, ask_user_end - ask_user
 
 manual:
 	.ascii "manual\0"
+
 users_answer:
 	.ascii "%s"
 
-.equ RECORD_SIZE, 7
-
+.equ RECORD_SIZE, 32
 .section .bss
 	.lcomm record_buffer, RECORD_SIZE
-
-#Common Linux Definitions
-#System Call Numbers
-.equ SYS_EXIT, 1
-.equ SYS_READ, 3
-.equ SYS_WRITE, 4
-.equ SYS_OPEN, 5
-.equ SYS_CLOSE, 6
-.equ SYS_BRK, 45
-
-#System Call Interrupt Number
-.equ LINUX_SYSCALL, 0x80
-
-#Standard File Descriptors
-.equ STDIN, 0
-.equ STDOUT, 1
-.equ STDERR, 2
-
-#Common Status Codes
-.equ END_OF_FILE, 0
 
 .section .text
 
@@ -42,21 +28,34 @@ _start:
 	/*# start stuff
 	pushl %ebp
 	movl %esp, %ebp */
-	pushl $hi_line
-	call printf
+	movl $STDOUT, %ebx
+	movl $hi_line, %ecx
+	movl $hi_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
 
 	# lets explane the user what he can do:
 	call start_man
 
 waiting_for_user:
-	pushl $ask_user
-	call printf
-	
-	# read what the user wants
-	pushl $record_buffer
-	pushl $users_answer
-	call scanf
+	movl $STDOUT, %ebx
+	movl $ask_user, %ecx
+	movl $ask_user_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
 
+	movl $STDIN, %ebx
+	movl $record_buffer, %ecx
+	movl $RECORD_SIZE, %edx
+	movl $SYS_READ, %eax
+	int $LINUX_SYSCALL
+
+	movl $STDOUT, %ebx
+	movl $record_buffer, %ecx
+	movl $RECORD_SIZE, %edx 
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+	/*
 	pushl $record_buffer
 	call printf
 
@@ -69,11 +68,14 @@ waiting_for_user:
 	# funtcions: - create a new data file
 	#			 - open an excist data file
 	#			 - show manual
-
-	call exit
-
+	*/
+	movl $0, %ebx
+	movl $SYS_EXIT, %eax
+	int $LINUX_SYSCALL
+/*
 man_ask:
 	call start_man
-	jmp waiting_for_user
-
-
+	jmp waiting_for_user */
+#4e9906
+#3464a1
+#c7d0bb#E8F2D9
