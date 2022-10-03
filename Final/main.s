@@ -17,7 +17,10 @@ manual:
 users_answer:
 	.ascii "%s"
 
-.equ RECORD_SIZE, 32
+new_line:
+	.ascii "\n"
+
+.equ RECORD_SIZE, 16
 .section .bss
 	.lcomm record_buffer, RECORD_SIZE
 
@@ -25,57 +28,130 @@ users_answer:
 
 .globl _start
 _start:
-	/*# start stuff
-	pushl %ebp
-	movl %esp, %ebp */
+	# Print the first hi-line in terminal
 	movl $STDOUT, %ebx
 	movl $hi_line, %ecx
 	movl $hi_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	# lets explane the user what he can do:
+	# Print the list of instructions in terminal
 	call start_man
 
 waiting_for_user:
+	# Print query line in terminal
 	movl $STDOUT, %ebx
 	movl $ask_user, %ecx
 	movl $ask_user_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
+	# Get the information from the terminal to the buffer
 	movl $STDIN, %ebx
 	movl $record_buffer, %ecx
 	movl $RECORD_SIZE, %edx
 	movl $SYS_READ, %eax
 	int $LINUX_SYSCALL
 
+	decl %eax
+	movl $0, record_buffer(,%eax,1)
+
+/*
+	# Print line to make sure recieving the command was successful
 	movl $STDOUT, %ebx
 	movl $record_buffer, %ecx
 	movl $RECORD_SIZE, %edx 
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
-	/*
+
 	pushl $record_buffer
-	call printf
+	call write
+	addl $4, %esp
+*/
+	# Start working with stack 
 
+	pushl $manual
+	pushl $record_buffer
+	call cmp_str
+	addl $8, %esp
 
-	# do what the user wants
-	cmp $record_buffer, manual
-	jne man_ask
-	
+	cmpl $1, %eax
+	je man_ask
 
 	# funtcions: - create a new data file
 	#			 - open an excist data file
 	#			 - show manual
-	*/
+
 	movl $0, %ebx
 	movl $SYS_EXIT, %eax
 	int $LINUX_SYSCALL
-/*
+
 man_ask:
 	call start_man
-	jmp waiting_for_user */
-#4e9906
-#3464a1
-#c7d0bb#E8F2D9
+	jmp waiting_for_user 
+
+.globl cmp_str
+.type cmp_str, @function
+cmp_str:
+	.equ BUFF_ADDRESS, 4
+	.equ MAN_ADDRESS, 8
+	movl BUFF_ADDRESS(%esp), %edx
+	movl MAN_ADDRESS(%esp), %ecx
+	movl $0, %edi
+
+cmp_loop:
+	movb (%edx), %al
+	cmpb $0, %al
+	je end_buff
+
+	movb (%edx), %al
+	movb (%ecx), %bl
+	cmpb %al, %bl
+	jne cmp_exit
+
+	incl %edx
+	incl %ecx
+	jmp cmp_loop
+
+end_buff:
+	movb (%edx), %al
+	movb (%ecx), %bl
+	cmpb %al, %bl
+	jne cmp_exit
+
+	movl $1, %edi
+	jmp cmp_exit
+
+cmp_exit:
+	movl %edi, %eax
+	ret	
+/*
+.globl write
+.type write, @function
+write:
+	movl 4(%esp), %edi
+
+loop:
+	movb (%edi), %al
+	cmpb $0, %al
+	je exit 
+
+	movl $STDOUT, %ebx
+	movl (%edi), %ecx
+	movl $1, %edx 
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	movl $STDOUT, %ebx
+	movl $new_line, %ecx
+	movl $1, %edx 
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	incl %edi
+
+	jmp loop
+
+exit:
+	ret
+*/
