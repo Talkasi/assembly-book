@@ -2,17 +2,47 @@
 .section .data
 
 hi_line:
-	.ascii "\nWelcome to the TasiApp!\n\n\0"
+	.ascii "┌─────────────────────────────────────────────────────────────┐\n"
+	.ascii "├─────────────────  Welcome to the TasIApp!  ─────────────────┤\n"
+	.ascii "├─────────────────────────────────────────────────────────────┤\n"
+	.ascii "│ Type 'manual' to list all the commands supported            │\n"
+	.asciz "├─────────────────────────────────────────────────────────────┘\n"
 hi_line_end:
 .equ hi_line_len, hi_line_end - hi_line
 
 ask_user:
-	.ascii "\nTyping line: \0"
+	.ascii "│ Command_line_@TasiApp: \0"
 ask_user_end:
 .equ ask_user_len, ask_user_end - ask_user
 
+error_command:
+	.ascii "│\n"
+	.ascii "│ TasIApp doesn't support this command.\n"
+	.ascii "│\n"
+	.ascii "│ Here is a list of all commands supported:\n"
+error_command_end:
+.equ error_command_len, error_command_end - error_command
+
+exit_line:
+	.ascii "└─────────────────────────────────────────────────────────────┘\n"
+exit_line_end:
+.equ exit_line_len, exit_line_end - exit_line
+
 manual:
 	.ascii "manual\0"
+
+exit:
+	.ascii "exit\0"
+
+create:
+	.ascii "create \0"
+
+file_created_n:
+	.ascii "│\n"
+	.ascii "│ File was successfully created.\n\0"
+	.ascii "│\n"
+file_created_n_end:
+.equ file_created_n_len, file_created_n_end - file_created_n
 
 users_answer:
 	.ascii "%s"
@@ -26,6 +56,10 @@ new_line:
 
 .section .text
 
+# TODO:
+	# funtcions: - create a new data file
+	#			 - open an excist data file
+
 .globl _start
 _start:
 	# Print the first hi-line in terminal
@@ -34,9 +68,6 @@ _start:
 	movl $hi_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
-
-	# Print the list of instructions in terminal
-	call start_man
 
 waiting_for_user:
 	# Print query line in terminal
@@ -56,20 +87,8 @@ waiting_for_user:
 	decl %eax
 	movl $0, record_buffer(,%eax,1)
 
-/*
-	# Print line to make sure recieving the command was successful
-	movl $STDOUT, %ebx
-	movl $record_buffer, %ecx
-	movl $RECORD_SIZE, %edx 
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
-
-	pushl $record_buffer
-	call write
-	addl $4, %esp
-*/
-	# Start working with stack 
-
+	# Manual check, compearing using "\0"
+	pushl $0
 	pushl $manual
 	pushl $record_buffer
 	call cmp_str
@@ -78,80 +97,59 @@ waiting_for_user:
 	cmpl $1, %eax
 	je man_ask
 
-	# funtcions: - create a new data file
-	#			 - open an excist data file
-	#			 - show manual
+	# Exit check, compearing using "\0"
+	pushl $0
+	pushl $exit
+	pushl $record_buffer
+	call cmp_str
+	addl $8, %esp
 
-	movl $0, %ebx
-	movl $SYS_EXIT, %eax
+	cmpl $1, %eax
+	je exit_ask
+
+	# Create file check, compearing + file_name find
+	pushl $1
+	pushl $create
+	pushl $record_buffer
+	call cmp_str
+	addl $8, %esp
+
+	cmpl $1, %eax
+	je create_ask
+
+	# Command not found
+	movl $STDOUT, %ebx
+	movl $error_command, %ecx
+	movl $error_command_len, %edx
+	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
+
+	call start_man
+	jmp waiting_for_user
 
 man_ask:
 	call start_man
 	jmp waiting_for_user 
 
-.globl cmp_str
-.type cmp_str, @function
-cmp_str:
-	.equ BUFF_ADDRESS, 4
-	.equ MAN_ADDRESS, 8
-	movl BUFF_ADDRESS(%esp), %edx
-	movl MAN_ADDRESS(%esp), %ecx
-	movl $0, %edi
+create_ask:
+	
 
-cmp_loop:
-	movb (%edx), %al
-	cmpb $0, %al
-	je end_buff
-
-	movb (%edx), %al
-	movb (%ecx), %bl
-	cmpb %al, %bl
-	jne cmp_exit
-
-	incl %edx
-	incl %ecx
-	jmp cmp_loop
-
-end_buff:
-	movb (%edx), %al
-	movb (%ecx), %bl
-	cmpb %al, %bl
-	jne cmp_exit
-
-	movl $1, %edi
-	jmp cmp_exit
-
-cmp_exit:
-	movl %edi, %eax
-	ret	
-/*
-.globl write
-.type write, @function
-write:
-	movl 4(%esp), %edi
-
-loop:
-	movb (%edi), %al
-	cmpb $0, %al
-	je exit 
-
+	# Send notification about our success
 	movl $STDOUT, %ebx
-	movl (%edi), %ecx
-	movl $1, %edx 
+	movl $file_created_n, %ecx
+	movl $file_created_n_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
+	jmp waiting_for_user
+
+exit_ask:
 	movl $STDOUT, %ebx
-	movl $new_line, %ecx
-	movl $1, %edx 
+	movl $exit_line, %ecx
+	movl $exit_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	incl %edi
-
-	jmp loop
-
-exit:
-	ret
-*/
+	movl $0, %ebx
+	movl $SYS_EXIT, %eax
+	int $LINUX_SYSCALL
