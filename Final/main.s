@@ -56,10 +56,6 @@ new_line:
 
 .section .text
 
-# TODO:
-	# funtcions: - create a new data file
-	#			 - open an excist data file
-
 .globl _start
 _start:
 	# Print the first hi-line in terminal
@@ -87,7 +83,7 @@ waiting_for_user:
 	decl %eax
 	movl $0, record_buffer(,%eax,1)
 
-	# Manual check, compearing using "\0"
+	# Manual check, comparing using "\0"
 	pushl $0
 	pushl $manual
 	pushl $record_buffer
@@ -97,7 +93,7 @@ waiting_for_user:
 	cmpl $1, %eax
 	je man_ask
 
-	# Exit check, compearing using "\0"
+	# Exit check, comparing using "\0"
 	pushl $0
 	pushl $exit
 	pushl $record_buffer
@@ -107,7 +103,7 @@ waiting_for_user:
 	cmpl $1, %eax
 	je exit_ask
 
-	# Create file check, compearing + file_name find
+	# Create file check, comparing + file_name existance check
 	pushl $1
 	pushl $create
 	pushl $record_buffer
@@ -132,7 +128,14 @@ man_ask:
 	jmp waiting_for_user 
 
 create_ask:
-	
+	movl $SYS_CREATE, %eax
+	movl $record_buffer + 7, %ebx
+	movl $03101, %ecx
+	movl $0666, %edx
+	int $LINUX_SYSCALL
+	# TODO: - don't notify about success when file was not created 🌚
+	#		- permissions stuff should be found
+	#		- Finally understand what TasIApp should do
 
 	# Send notification about our success
 	movl $STDOUT, %ebx
