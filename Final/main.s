@@ -24,9 +24,19 @@ error_command_end:
 .equ error_command_len, error_command_end - error_command
 
 exit_line:
+	.ascii "├─────────────────────────────────────────────────────────────┐\n"
+	.ascii "├──────────────────────  Good bye! 🌚  ───────────────────────┤\n"
 	.ascii "└─────────────────────────────────────────────────────────────┘\n"
 exit_line_end:
 .equ exit_line_len, exit_line_end - exit_line
+
+file_exist_line:
+	.ascii "│\n"
+	.ascii "│ Error. File was not created.\n"
+	.ascii "│ Try to change file_name or directory to solve the problem\n"
+	.ascii "│\n"
+file_exist_line_end:
+.equ file_exist_line_len, file_exist_line_end - file_exist_line
 
 manual:
 	.ascii "manual\0"
@@ -36,6 +46,15 @@ exit:
 
 create:
 	.ascii "create \0"
+
+view:
+	.ascii "view \0"
+
+beauty:
+	.ascii "│\n"
+	.ascii "│ "
+beauty_end:
+.equ beauty_len, beauty_end - beauty
 
 file_created_n:
 	.ascii "│\n"
@@ -48,11 +67,16 @@ users_answer:
 	.ascii "%s"
 
 new_line:
-	.ascii "\n"
+	.ascii "\n│\n"
+new_line_end:
+.equ new_line_len, new_line_end - new_line
 
 .equ RECORD_SIZE, 16
 .section .bss
 	.lcomm record_buffer, RECORD_SIZE
+.equ DATA_SIZE, 105
+.section .bss
+	.lcomm data_buffer, DATA_SIZE
 
 .section .text
 
@@ -113,6 +137,16 @@ waiting_for_user:
 	cmpl $1, %eax
 	je create_ask
 
+	# View check, comparing + file_name existance check
+	pushl $1
+	pushl $view
+	pushl $record_buffer
+	call cmp_str
+	addl $8, %esp
+
+	cmpl $1, %eax
+	je view_ask
+
 	# Command not found
 	movl $STDOUT, %ebx
 	movl $error_command, %ecx
@@ -130,12 +164,11 @@ man_ask:
 create_ask:
 	movl $SYS_CREATE, %eax
 	movl $record_buffer + 7, %ebx
-	movl $03101, %ecx
-	movl $0666, %edx
+	movl $0777, %ecx
 	int $LINUX_SYSCALL
-	# TODO: - don't notify about success when file was not created 🌚
-	#		- permissions stuff should be found
-	#		- Finally understand what TasIApp should do
+
+	cmpl $0, %eax 
+	jl file_exist
 
 	# Send notification about our success
 	movl $STDOUT, %ebx
@@ -144,6 +177,50 @@ create_ask:
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
+	jmp waiting_for_user
+
+file_exist:
+	movl $STDOUT, %ebx
+	movl $file_exist_line, %ecx
+	movl $file_exist_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	jmp waiting_for_user
+
+view_ask:
+	movl $SYS_OPEN, %eax 
+	movl $record_buffer + 5, %ebx
+	movl $2, %ecx
+	movl $0777, %edx
+	int $LINUX_SYSCALL
+
+	movl %eax, %ebx
+	movl $SYS_READ, %eax
+	movl $data_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	int $LINUX_SYSCALL
+
+	movl $STDOUT, %ebx
+	movl $beauty, %ecx
+	movl $beauty_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	movl $STDOUT, %ebx
+	movl $data_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	movl $STDOUT, %ebx
+	movl $new_line, %ecx
+	movl $new_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	#TODO:		- count number of records
+	
 	jmp waiting_for_user
 
 exit_ask:

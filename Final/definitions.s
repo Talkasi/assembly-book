@@ -5,6 +5,7 @@
 .equ SYS_WRITE, 4
 .equ SYS_OPEN, 5
 .equ SYS_CLOSE, 6
+.equ SYS_CREATE, 8
 .equ SYS_BRK, 45
 
 #System Call Interrupt Number
