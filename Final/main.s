@@ -12,15 +12,14 @@ hi_line_end:
 .equ hi_line_len, hi_line_end - hi_line
 
 beauty_line:
-	.ascii "│\n"
-	.ascii "│ "
+	.ascii "│\n│ "
 beauty_line_end:
 .equ beauty_line_len, beauty_line_end - beauty_line
 
-new_line:
+new_beauty_line:
 	.ascii "\n│\n"
-new_line_end:
-.equ new_line_len, new_line_end - new_line
+new_beauty_line_end:
+.equ new_beauty_line_len, new_beauty_line_end - new_beauty_line
 
 file_created_n_line:
 	.ascii "│\n"
@@ -57,6 +56,28 @@ exit_line:
 exit_line_end:
 .equ exit_line_len, exit_line_end - exit_line
 
+# Add record line block
+car_model_line:
+	.ascii "│\n"
+	.ascii "│ Enter model of the car: \0"
+car_model_line_end:
+.equ car_model_line_len, car_model_line_end - car_model_line
+
+license_plate_line:
+	.ascii "│ Enter license plate: \0"
+license_plate_line_end:
+.equ license_plate_line_len, license_plate_line_end - license_plate_line
+
+manufacture_year_line:
+	.ascii "│ Enter year of car manufacture: \0"
+manufacture_year_line_end:
+.equ manufacture_year_line_len, manufacture_year_line_end - manufacture_year_line
+
+owner_line:
+	.ascii "│ Enter owner of the car: \0"
+owner_line_end:
+.equ owner_line_len, owner_line_end - owner_line
+
 # Commands block to check what user wants
 manual_command:
 	.ascii "manual\0"
@@ -71,17 +92,29 @@ view_command:
 	.ascii "view \0"
 
 add_record_command:
-	.ascii "add record\0"
+	.ascii "add record \0"
+
+new_line:
+	.ascii "\n"
 
 # Buffers block
 .equ RECORD_SIZE, 16
 .section .bss
 	.lcomm record_buffer, RECORD_SIZE
 
-.equ DATA_SIZE, 105
+.equ DATA_SIZE, 120
 .section .bss
 	.lcomm data_buffer, DATA_SIZE
 
+.equ CAR_MODEL_POSITION, 0
+.equ LICENSE_PLATE_POSITION, 25
+.equ MANUFACTURE_YEAR_POSITION, 40
+.equ OWNER_POSITION, 49
+
+.equ CAR_MODEL_LEN, 21
+.equ LICENSE_PLATE_LEN, 11
+.equ MANUFACTURE_YEAR_LEN, 5
+.equ OWNER_LEN, 71
 
 .section .text
 
@@ -109,8 +142,7 @@ waiting_for_user:
 	movl $SYS_READ, %eax
 	int $LINUX_SYSCALL
 
-	decl %eax
-	movl $0, record_buffer(,%eax,1)
+	movl $0, record_buffer - 1(%eax)
 
 	# Manual check, comparing using "\0"
 	pushl $0
@@ -152,15 +184,15 @@ waiting_for_user:
 	cmpl $1, %eax
 	je view_ask
 
-	# Add record check, comparing using "\0"
-	pushl $0
+	# Add record check, comparing + file_name existance check
+	pushl $1
 	pushl $add_record_command
 	pushl $record_buffer
 	call cmp_str
 	addl $12, %esp
 
 	cmpl $1, %eax 
-	je add_record_ask
+	je buf_init
 
 	# Command not found
 	movl $STDOUT, %ebx
@@ -229,8 +261,8 @@ view_ask:
 	int $LINUX_SYSCALL
 
 	movl $STDOUT, %ebx
-	movl $new_line, %ecx
-	movl $new_line_len, %edx
+	movl $new_beauty_line, %ecx
+	movl $new_beauty_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
@@ -240,7 +272,119 @@ view_ask:
 
 	jmp waiting_for_user
 
+# Buff init *function*, but works only with data buffer
+buf_init:
+	movl $0, %edi 
+	jmp buf_init_loop
+
+buf_init_loop:
+	cmpl $DATA_SIZE, %edi
+	je buf_init_end
+
+	movb $32, data_buffer(%edi)
+
+	incl %edi 
+	jmp buf_init_loop
+
+buf_init_end:
+	# If initialization will be needed not only in add_recoed_ask 
+	# (state from the stack should be added in this case)
+	movb $10, data_buffer - 1(%edi)
+
+	jmp add_record_ask
+
+
 add_record_ask:
+	# Ask for a car model
+	movl $STDOUT, %ebx
+	movl $car_model_line, %ecx 
+	movl $car_model_line_len, %edx 
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	# Write car model into a data buffer
+	movl $STDIN, %ebx
+	movl $data_buffer + CAR_MODEL_POSITION, %ecx 
+	movl $CAR_MODEL_LEN, %edx
+	movl $SYS_READ, %eax 
+	int $LINUX_SYSCALL
+
+	movb $32, data_buffer + CAR_MODEL_POSITION - 1(%eax)
+
+	# Ask for a licence plate
+	movl $STDOUT, %ebx
+	movl $license_plate_line, %ecx 
+	movl $license_plate_line_len, %edx 
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
+
+	# Write licence plate into a data buffer
+	movl $STDIN, %ebx
+	movl $data_buffer + LICENSE_PLATE_POSITION, %ecx 
+	movl $LICENSE_PLATE_LEN, %edx
+	movl $SYS_READ, %eax 
+	int $LINUX_SYSCALL
+
+	movb $32, data_buffer + LICENSE_PLATE_POSITION - 1(%eax)
+
+	# Ask for a manufacture year
+	movl $STDOUT, %ebx
+	movl $manufacture_year_line, %ecx 
+	movl $manufacture_year_line_len, %edx 
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
+
+	# Write manufacture year into a data buffer
+	movl $STDIN, %ebx
+	movl $data_buffer + MANUFACTURE_YEAR_POSITION, %ecx 
+	movl $MANUFACTURE_YEAR_LEN, %edx
+	movl $SYS_READ, %eax 
+	int $LINUX_SYSCALL
+
+	movb $32, data_buffer + MANUFACTURE_YEAR_POSITION - 1(%eax)
+
+	# Ask for an owner's name
+	movl $STDOUT, %ebx
+	movl $owner_line, %ecx 
+	movl $owner_line_len, %edx 
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
+
+	# Write owner's name into a data buffer
+	movl $STDIN, %ebx
+	movl $data_buffer + OWNER_POSITION, %ecx 
+	movl $OWNER_LEN, %edx
+	movl $SYS_READ, %eax 
+	int $LINUX_SYSCALL	
+
+	movb $32, data_buffer + OWNER_POSITION - 1(%eax)
+
+	movl $STDOUT, %ebx
+	movl $beauty_line, %ecx 
+	movl $beauty_line_len, %edx 
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
+
+
+	movl $STDOUT, %ebx
+	movl $data_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	movl $STDOUT, %ebx
+	movl $new_beauty_line, %ecx 
+	movl $new_beauty_line_len, %edx 
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
+
+	# Write into a file
+	movl $record_buffer + 11, %ebx	# Open function
+	movl $data_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
 	jmp waiting_for_user
 
 
