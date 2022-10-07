@@ -23,9 +23,9 @@ new_line:
 
 .section .text
 
-.globl start_man
-.type start_man, @function
-start_man:
+.globl print_man
+.type print_man, @function
+print_man:
 	pushl %ebp
 	movl %esp, %ebp
 

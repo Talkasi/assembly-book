@@ -1,6 +1,7 @@
 .include "definitions.s"
 .section .data
 
+# Lines to print block
 hi_line:
 	.ascii "┌─────────────────────────────────────────────────────────────┐\n"
 	.ascii "├─────────────────  Welcome to the TasIApp!  ─────────────────┤\n"
@@ -10,25 +11,36 @@ hi_line:
 hi_line_end:
 .equ hi_line_len, hi_line_end - hi_line
 
-ask_user:
-	.ascii "│ Command_line_@TasiApp: \0"
-ask_user_end:
-.equ ask_user_len, ask_user_end - ask_user
+beauty_line:
+	.ascii "│\n"
+	.ascii "│ "
+beauty_line_end:
+.equ beauty_line_len, beauty_line_end - beauty_line
 
-error_command:
+new_line:
+	.ascii "\n│\n"
+new_line_end:
+.equ new_line_len, new_line_end - new_line
+
+file_created_n_line:
+	.ascii "│\n"
+	.ascii "│ File was successfully created.\n\0"
+	.ascii "│\n"
+file_created_n_line_end:
+.equ file_created_n_line_len, file_created_n_line_end - file_created_n_line
+
+ask_user_line:
+	.ascii "│ Command_line_@TasiApp: \0"
+ask_user_line_end:
+.equ ask_user_line_len, ask_user_line_end - ask_user_line
+
+error_command_line:
 	.ascii "│\n"
 	.ascii "│ TasIApp doesn't support this command.\n"
 	.ascii "│\n"
 	.ascii "│ Here is a list of all commands supported:\n"
-error_command_end:
-.equ error_command_len, error_command_end - error_command
-
-exit_line:
-	.ascii "├─────────────────────────────────────────────────────────────┐\n"
-	.ascii "├──────────────────────  Good bye! 🌚  ───────────────────────┤\n"
-	.ascii "└─────────────────────────────────────────────────────────────┘\n"
-exit_line_end:
-.equ exit_line_len, exit_line_end - exit_line
+error_command_line_end:
+.equ error_command_line_len, error_command_line_end - error_command_line
 
 file_exist_line:
 	.ascii "│\n"
@@ -38,45 +50,38 @@ file_exist_line:
 file_exist_line_end:
 .equ file_exist_line_len, file_exist_line_end - file_exist_line
 
-manual:
+exit_line:
+	.ascii "├─────────────────────────────────────────────────────────────┐\n"
+	.ascii "├──────────────────────  Good bye! 🌚  ───────────────────────┤\n"
+	.ascii "└─────────────────────────────────────────────────────────────┘\n"
+exit_line_end:
+.equ exit_line_len, exit_line_end - exit_line
+
+# Commands block to check what user wants
+manual_command:
 	.ascii "manual\0"
 
-exit:
+exit_command:
 	.ascii "exit\0"
 
-create:
+create_command:
 	.ascii "create \0"
 
-view:
+view_command:
 	.ascii "view \0"
 
-beauty:
-	.ascii "│\n"
-	.ascii "│ "
-beauty_end:
-.equ beauty_len, beauty_end - beauty
+add_record_command:
+	.ascii "add record\0"
 
-file_created_n:
-	.ascii "│\n"
-	.ascii "│ File was successfully created.\n\0"
-	.ascii "│\n"
-file_created_n_end:
-.equ file_created_n_len, file_created_n_end - file_created_n
-
-users_answer:
-	.ascii "%s"
-
-new_line:
-	.ascii "\n│\n"
-new_line_end:
-.equ new_line_len, new_line_end - new_line
-
+# Buffers block
 .equ RECORD_SIZE, 16
 .section .bss
 	.lcomm record_buffer, RECORD_SIZE
+
 .equ DATA_SIZE, 105
 .section .bss
 	.lcomm data_buffer, DATA_SIZE
+
 
 .section .text
 
@@ -92,8 +97,8 @@ _start:
 waiting_for_user:
 	# Print query line in terminal
 	movl $STDOUT, %ebx
-	movl $ask_user, %ecx
-	movl $ask_user_len, %edx
+	movl $ask_user_line, %ecx
+	movl $ask_user_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
@@ -109,56 +114,66 @@ waiting_for_user:
 
 	# Manual check, comparing using "\0"
 	pushl $0
-	pushl $manual
+	pushl $manual_command
 	pushl $record_buffer
 	call cmp_str
-	addl $8, %esp
+	addl $12, %esp
 
 	cmpl $1, %eax
 	je man_ask
 
 	# Exit check, comparing using "\0"
 	pushl $0
-	pushl $exit
+	pushl $exit_command
 	pushl $record_buffer
 	call cmp_str
-	addl $8, %esp
+	addl $12, %esp
 
 	cmpl $1, %eax
 	je exit_ask
 
 	# Create file check, comparing + file_name existance check
 	pushl $1
-	pushl $create
+	pushl $create_command
 	pushl $record_buffer
 	call cmp_str
-	addl $8, %esp
+	addl $12, %esp
 
 	cmpl $1, %eax
 	je create_ask
 
 	# View check, comparing + file_name existance check
 	pushl $1
-	pushl $view
+	pushl $view_command
 	pushl $record_buffer
 	call cmp_str
-	addl $8, %esp
+	addl $12, %esp
 
 	cmpl $1, %eax
 	je view_ask
 
+	# Add record check, comparing using "\0"
+	pushl $0
+	pushl $add_record_command
+	pushl $record_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax 
+	je add_record_ask
+
 	# Command not found
 	movl $STDOUT, %ebx
-	movl $error_command, %ecx
-	movl $error_command_len, %edx
+	movl $error_command_line, %ecx
+	movl $error_command_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	call start_man
+	call print_man
 	jmp waiting_for_user
 
 man_ask:
-	call start_man
+	call print_man
 	jmp waiting_for_user 
 
 create_ask:
@@ -172,8 +187,8 @@ create_ask:
 
 	# Send notification about our success
 	movl $STDOUT, %ebx
-	movl $file_created_n, %ecx
-	movl $file_created_n_len, %edx
+	movl $file_created_n_line, %ecx
+	movl $file_created_n_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
@@ -202,8 +217,8 @@ view_ask:
 	int $LINUX_SYSCALL
 
 	movl $STDOUT, %ebx
-	movl $beauty, %ecx
-	movl $beauty_len, %edx
+	movl $beauty_line, %ecx
+	movl $beauty_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
@@ -219,9 +234,15 @@ view_ask:
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	#TODO:		- count number of records
-	
+	#TODO:		- add "add record" command
+	#			- count number of records to make view command work normally
+	#			- fix success notification (again)
+
 	jmp waiting_for_user
+
+add_record_ask:
+	jmp waiting_for_user
+
 
 exit_ask:
 	movl $STDOUT, %ebx
