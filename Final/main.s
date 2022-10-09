@@ -16,30 +16,6 @@ ask_user_line:
 ask_user_line_end:
 .equ ask_user_line_len, ask_user_line_end - ask_user_line
 
-error_command_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. TasIApp doesn't support this command.\n"
-	.ascii "│\n"
-	.ascii "│ Here is a list of all commands supported:\n"
-error_command_line_end:
-.equ error_command_line_len, error_command_line_end - error_command_line
-
-create_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. File was not created.\n"
-	.ascii "│ Try to change file_name or directory to solve this problem.\n"
-	.ascii "│\n"
-create_error_line_end:
-.equ create_error_line_len, create_error_line_end - create_error_line
-
-open_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. File was not opened.\n"
-	.ascii "│ You should create file before open it.\n"
-	.ascii "│\n"
-open_error_line_end:
-.equ open_error_line_len, open_error_line_end - open_error_line
-
 exit_line:
 	.ascii "├─────────────────────────────────────────────────────────────┐\n"
 	.ascii "├──────────────────────  Good bye! 🌚  ───────────────────────┤\n"
@@ -94,14 +70,65 @@ close_command:
 new_line:
 	.ascii "\n"
 
+# Errors line block
+command_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. TasIApp doesn't support this command.\n"
+	.ascii "│\n"
+	.ascii "│ Here is a list of all commands supported:\n"
+command_error_line_end:
+.equ command_error_line_len, command_error_line_end - command_error_line
+
+create_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not created.\n"
+	.ascii "│ - Try to change file_name or directory to solve this problem.\n"
+	.ascii "│\n"
+create_error_line_end:
+.equ create_error_line_len, create_error_line_end - create_error_line
+
+open_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not opened.\n"
+	.ascii "│ - You should create file before open it.\n"
+	.ascii "│ - Only one file can be opened at a time.\n"
+	.ascii "│ Close the file you're working with to open another one.\n"
+	.ascii "│\n"
+open_error_line_end:
+.equ open_error_line_len, open_error_line_end - open_error_line
+
+not_opened_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not opened.\n"
+	.ascii "│ - You should open file before dealing with it.\n"
+	.ascii "│\n"
+not_opened_error_line_end:
+.equ not_opened_error_line_len, not_opened_error_line_end - not_opened_error_line
+
+close_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not closed.\n"
+	.ascii "│ - Only opened files can be closed\n"
+	.ascii "│\n"
+close_error_line_end:
+.equ close_error_line_len, close_error_line_end - close_error_line
+
+not_closed_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. Close opened file to exit TasIApp.\n"
+	.ascii "│\n"
+not_closed_error_line_end:
+.equ not_closed_error_line_len, not_closed_error_line_end - not_closed_error_line
+
+
 # Buffers block
-.equ RECORD_SIZE, 16
+.equ RECORD_SIZE, 100
+.equ DATA_SIZE, 120
+.equ OPENED_FILE_NAME_SIZE, 50
 .section .bss
 	.lcomm record_buffer, RECORD_SIZE
-
-.equ DATA_SIZE, 120
-.section .bss
 	.lcomm data_buffer, DATA_SIZE
+	.lcomm opened_file_name_buffer, OPENED_FILE_NAME_SIZE
 
 .equ CAR_MODEL_POSITION, 0
 .equ LICENSE_PLATE_POSITION, 25
@@ -127,6 +154,12 @@ _start:
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
+	# To check if file is opened at the moment
+	.equ OPENED_FLAG, -4
+	push $0
+
+
+# Main loop
 waiting_for_user:
 	# Print query line in terminal
 	movl $STDOUT, %ebx
@@ -192,7 +225,7 @@ waiting_for_user:
 	addl $12, %esp
 
 	cmpl $1, %eax 
-	je buf_init
+	je add_record_ask
 
 	# Open file check, comparing + file_name existance check
 	pushl $1
@@ -216,20 +249,21 @@ waiting_for_user:
 
 	# Command not found
 	movl $STDOUT, %ebx
-	movl $error_command_line, %ecx
-	movl $error_command_line_len, %edx
+	movl $command_error_line, %ecx
+	movl $command_error_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
 	call print_man
 	jmp waiting_for_user
 
+
+# Commands block
 man_ask:
 	call print_man
 	jmp waiting_for_user 
 
 create_ask:
-	# Check if file is already exist
 	movl $SYS_OPEN, %eax
 	movl $record_buffer + 7, %ebx
 	movl $2, %ecx
@@ -246,15 +280,6 @@ create_ask:
 
 	jmp waiting_for_user
 
-create_error:
-	movl $STDOUT, %ebx
-	movl $create_error_line, %ecx
-	movl $create_error_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
-
-	jmp waiting_for_user
-
 open_ask:
 	movl $SYS_OPEN, %eax
 	movl $record_buffer + 5, %ebx
@@ -265,24 +290,44 @@ open_ask:
 	cmpl $0, %eax 
 	jl open_error
 
-	pushl %eax 											#TODO: open multiple files, errors check
+	cmpl $0, OPENED_FLAG(%ebp)
+	jne open_error
 
-	jmp waiting_for_user
+	movl $1, OPENED_FLAG(%ebp)
+	pushl %eax
+	.equ DESCRIPTOR_POSITION, -8
 
-open_error:
-	movl $STDOUT, %ebx
-	movl $open_error_line, %ecx
-	movl $open_error_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $OPENED_FILE_NAME_SIZE
+	pushl $opened_file_name_buffer
+	call buf_init
+	addl $8, %esp
+
+	pushl $record_buffer + 5
+	pushl $opened_file_name_buffer
+	call cpy_str
+	addl $8, %esp
 
 	jmp waiting_for_user
 
 view_ask:												#TODO: view all records in file
-	.equ DESCRIPTOR_POSITION, -4
-	movl DESCRIPTOR_POSITION(%ebp), %eax
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
 
-	movl %eax, %ebx
+	pushl $0
+	pushl $record_buffer + 5
+	pushl $opened_file_name_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	jne not_opened_error
+
+	cmpl $0, OPENED_FLAG(%ebp)
+	je not_opened_error
+
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
 	movl $SYS_READ, %eax
 	movl $data_buffer, %ecx
 	movl $DATA_SIZE, %edx
@@ -302,28 +347,24 @@ view_ask:												#TODO: view all records in file
 
 	jmp waiting_for_user
 
-# Buff init *function*, but works only with data buffer
-buf_init:
-	movl $0, %edi 
-	jmp buf_init_loop
+add_record_ask:											#TODO: add record to the end of file
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
 
-buf_init_loop:
-	cmpl $DATA_SIZE, %edi
-	je buf_init_end
+	pushl $0
+	pushl $record_buffer + 11
+	pushl $opened_file_name_buffer
+	call cmp_str
+	addl $12, %esp
 
-	movb $32, data_buffer(%edi)
+	cmpl $1, %eax
+	jne not_opened_error
 
-	incl %edi 
-	jmp buf_init_loop
+	cmpl $0, OPENED_FLAG(%ebp)
+	je not_opened_error
 
-buf_init_end:
-	# If initialization will be needed not only in add_record_ask 
-	# (state from the stack should be added in this case)
-	movb $10, data_buffer - 1(%edi)
-
-	jmp add_record_ask
-
-add_record_ask:												#TODO: add record to the end of file
 	# Ask for a car model
 	movl $STDOUT, %ebx
 	movl $car_model_line, %ecx 
@@ -399,10 +440,7 @@ add_record_ask:												#TODO: add record to the end of file
 	call new_slash_new_line_func
 
 	# Write into a file
-	.equ DESCRIPTOR_POSITION, -4
-	movl DESCRIPTOR_POSITION(%ebp), %eax
-
-	movl %eax, %ebx	# Open function
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
 	movl $data_buffer, %ecx
 	movl $DATA_SIZE, %edx
 	movl $SYS_WRITE, %eax
@@ -411,16 +449,39 @@ add_record_ask:												#TODO: add record to the end of file
 	jmp waiting_for_user
 
 close_ask:
-	.equ DESCRIPTOR_POSITION, -4
-	movl DESCRIPTOR_POSITION(%ebp), %eax
+	cmpl $0, OPENED_FLAG(%ebp)
+	je close_error
 
-	movl %eax, %ebx
+	pushl $0
+	pushl $record_buffer + 6
+	pushl $opened_file_name_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	jne close_error
+
+	pushl $OPENED_FILE_NAME_SIZE
+	pushl $opened_file_name_buffer
+	call buf_init
+	addl $8, %esp
+
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
 	movl $SYS_CLOSE, %eax
 	int $LINUX_SYSCALL
+
+	# Error check
+	cmpl $0, %eax
+	jl close_error
+
+	movl $0, OPENED_FLAG(%ebp)
+	addl $4, %esp
 	jmp waiting_for_user
 
-
 exit_ask:
+	cmpl $0, OPENED_FLAG(%ebp)
+	jne not_closed_error
+
 	movl $STDOUT, %ebx
 	movl $exit_line, %ecx
 	movl $exit_line_len, %edx
@@ -433,3 +494,55 @@ exit_ask:
 	movl $0, %ebx
 	movl $SYS_EXIT, %eax
 	int $LINUX_SYSCALL
+
+
+# Errors block
+create_error:
+	# Print error message
+	movl $STDOUT, %ebx
+	movl $create_error_line, %ecx
+	movl $create_error_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	jmp waiting_for_user
+
+open_error:
+	# Print error message
+	movl $STDOUT, %ebx
+	movl $open_error_line, %ecx
+	movl $open_error_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	jmp waiting_for_user
+
+not_opened_error:
+	# Print error message
+	movl $STDOUT, %ebx
+	movl $not_opened_error_line, %ecx
+	movl $not_opened_error_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	jmp waiting_for_user
+
+close_error:
+	# Print error message
+	movl $STDOUT, %ebx
+	movl $close_error_line, %ecx
+	movl $close_error_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	jmp waiting_for_user
+
+not_closed_error:
+	# Print error message
+	movl $STDOUT, %ebx
+	movl $not_closed_error_line, %ecx
+	movl $not_closed_error_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	jmp waiting_for_user
