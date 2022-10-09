@@ -11,16 +11,6 @@ hi_line:
 hi_line_end:
 .equ hi_line_len, hi_line_end - hi_line
 
-beauty_line:
-	.ascii "│\n│ "
-beauty_line_end:
-.equ beauty_line_len, beauty_line_end - beauty_line
-
-new_beauty_line:
-	.ascii "\n│\n"
-new_beauty_line_end:
-.equ new_beauty_line_len, new_beauty_line_end - new_beauty_line
-
 file_created_n_line:
 	.ascii "│\n"
 	.ascii "│ File was successfully created.\n\0"
@@ -94,6 +84,12 @@ view_command:
 add_record_command:
 	.ascii "add record \0"
 
+open_command:
+	.ascii "open \0"
+
+close_command:
+	.ascii "close \0"
+
 new_line:
 	.ascii "\n"
 
@@ -120,6 +116,9 @@ new_line:
 
 .globl _start
 _start:
+	pushl %ebp
+	movl %esp, %ebp
+
 	# Print the first hi-line in terminal
 	movl $STDOUT, %ebx
 	movl $hi_line, %ecx
@@ -194,6 +193,26 @@ waiting_for_user:
 	cmpl $1, %eax 
 	je buf_init
 
+	# Open file check, comparing + file_name existance check
+	pushl $1
+	pushl $open_command
+	pushl $record_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	je open_ask
+
+	# Close file check, comparing + file_name existance check
+	pushl $1
+	pushl $close_command
+	pushl $record_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	je close_ask
+
 	# Command not found
 	movl $STDOUT, %ebx
 	movl $error_command_line, %ecx
@@ -215,7 +234,7 @@ create_ask:
 	int $LINUX_SYSCALL
 
 	cmpl $0, %eax 
-	jl file_exist
+	jl file_exist                                        #TODO: check if file is already exist
 
 	# Send notification about our success
 	movl $STDOUT, %ebx
@@ -235,12 +254,22 @@ file_exist:
 
 	jmp waiting_for_user
 
-view_ask:
-	movl $SYS_OPEN, %eax 
+open_ask:
+	movl $SYS_OPEN, %eax
 	movl $record_buffer + 5, %ebx
 	movl $2, %ecx
 	movl $0777, %edx
 	int $LINUX_SYSCALL
+
+	pushl %eax 											#TODO: open multiple files, errors checkб 
+
+	call new_slash_new_line_func
+
+	jmp waiting_for_user
+
+view_ask:												#TODO: view all records in file
+	.equ DESCRIPTOR_POSITION, -4
+	movl DESCRIPTOR_POSITION(%ebp), %eax
 
 	movl %eax, %ebx
 	movl $SYS_READ, %eax
@@ -248,11 +277,7 @@ view_ask:
 	movl $DATA_SIZE, %edx
 	int $LINUX_SYSCALL
 
-	movl $STDOUT, %ebx
-	movl $beauty_line, %ecx
-	movl $beauty_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	call slash_new_slash_line_func
 
 	movl $STDOUT, %ebx
 	movl $data_buffer, %ecx
@@ -260,11 +285,7 @@ view_ask:
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	movl $STDOUT, %ebx
-	movl $new_beauty_line, %ecx
-	movl $new_beauty_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	call new_slash_new_line_func
 
 	#TODO:		- add "add record" command
 	#			- count number of records to make view command work normally
@@ -293,8 +314,7 @@ buf_init_end:
 
 	jmp add_record_ask
 
-
-add_record_ask:
+add_record_ask:												#TODO: add record to the end of file
 	# Ask for a car model
 	movl $STDOUT, %ebx
 	movl $car_model_line, %ecx 
@@ -359,12 +379,7 @@ add_record_ask:
 
 	movb $32, data_buffer + OWNER_POSITION - 1(%eax)
 
-	movl $STDOUT, %ebx
-	movl $beauty_line, %ecx 
-	movl $beauty_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
-
+	call slash_new_slash_line_func
 
 	movl $STDOUT, %ebx
 	movl $data_buffer, %ecx
@@ -372,19 +387,27 @@ add_record_ask:
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	movl $STDOUT, %ebx
-	movl $new_beauty_line, %ecx 
-	movl $new_beauty_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
+	call new_slash_new_line_func
 
 	# Write into a file
-	movl $record_buffer + 11, %ebx	# Open function
+	.equ DESCRIPTOR_POSITION, -4
+	movl DESCRIPTOR_POSITION(%ebp), %eax
+
+	movl %eax, %ebx	# Open function
 	movl $data_buffer, %ecx
 	movl $DATA_SIZE, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
+	jmp waiting_for_user
+
+close_ask:
+	.equ DESCRIPTOR_POSITION, -4
+	movl DESCRIPTOR_POSITION(%ebp), %eax
+
+	movl %eax, %ebx
+	movl $SYS_CLOSE, %eax
+	int $LINUX_SYSCALL
 	jmp waiting_for_user
 
 
@@ -394,6 +417,9 @@ exit_ask:
 	movl $exit_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
+
+	movl %ebp, %esp
+	popl %ebp
 
 	movl $0, %ebx
 	movl $SYS_EXIT, %eax
