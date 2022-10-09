@@ -11,13 +11,6 @@ hi_line:
 hi_line_end:
 .equ hi_line_len, hi_line_end - hi_line
 
-file_created_n_line:
-	.ascii "│\n"
-	.ascii "│ File was successfully created.\n\0"
-	.ascii "│\n"
-file_created_n_line_end:
-.equ file_created_n_line_len, file_created_n_line_end - file_created_n_line
-
 ask_user_line:
 	.ascii "│ Command_line_@TasiApp: \0"
 ask_user_line_end:
@@ -25,19 +18,27 @@ ask_user_line_end:
 
 error_command_line:
 	.ascii "│\n"
-	.ascii "│ TasIApp doesn't support this command.\n"
+	.ascii "│ [!]Error. TasIApp doesn't support this command.\n"
 	.ascii "│\n"
 	.ascii "│ Here is a list of all commands supported:\n"
 error_command_line_end:
 .equ error_command_line_len, error_command_line_end - error_command_line
 
-file_exist_line:
+create_error_line:
 	.ascii "│\n"
-	.ascii "│ Error. File was not created.\n"
-	.ascii "│ Try to change file_name or directory to solve the problem\n"
+	.ascii "│ [!]Error. File was not created.\n"
+	.ascii "│ Try to change file_name or directory to solve this problem.\n"
 	.ascii "│\n"
-file_exist_line_end:
-.equ file_exist_line_len, file_exist_line_end - file_exist_line
+create_error_line_end:
+.equ create_error_line_len, create_error_line_end - create_error_line
+
+open_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not opened.\n"
+	.ascii "│ You should create file before open it.\n"
+	.ascii "│\n"
+open_error_line_end:
+.equ open_error_line_len, open_error_line_end - open_error_line
 
 exit_line:
 	.ascii "├─────────────────────────────────────────────────────────────┐\n"
@@ -228,27 +229,27 @@ man_ask:
 	jmp waiting_for_user 
 
 create_ask:
+	# Check if file is already exist
+	movl $SYS_OPEN, %eax
+	movl $record_buffer + 7, %ebx
+	movl $2, %ecx
+	movl $0777, %edx
+	int $LINUX_SYSCALL
+
+	cmpl $0, %eax 
+	jnl create_error
+
 	movl $SYS_CREATE, %eax
 	movl $record_buffer + 7, %ebx
 	movl $0777, %ecx
 	int $LINUX_SYSCALL
 
-	cmpl $0, %eax 
-	jl file_exist                                        #TODO: check if file is already exist
-
-	# Send notification about our success
-	movl $STDOUT, %ebx
-	movl $file_created_n_line, %ecx
-	movl $file_created_n_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
-
 	jmp waiting_for_user
 
-file_exist:
+create_error:
 	movl $STDOUT, %ebx
-	movl $file_exist_line, %ecx
-	movl $file_exist_line_len, %edx
+	movl $create_error_line, %ecx
+	movl $create_error_line_len, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
@@ -261,9 +262,19 @@ open_ask:
 	movl $0777, %edx
 	int $LINUX_SYSCALL
 
-	pushl %eax 											#TODO: open multiple files, errors checkб 
+	cmpl $0, %eax 
+	jl open_error
 
-	call new_slash_new_line_func
+	pushl %eax 											#TODO: open multiple files, errors check
+
+	jmp waiting_for_user
+
+open_error:
+	movl $STDOUT, %ebx
+	movl $open_error_line, %ecx
+	movl $open_error_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
 
 	jmp waiting_for_user
 
@@ -287,9 +298,7 @@ view_ask:												#TODO: view all records in file
 
 	call new_slash_new_line_func
 
-	#TODO:		- add "add record" command
 	#			- count number of records to make view command work normally
-	#			- fix success notification (again)
 
 	jmp waiting_for_user
 
@@ -308,7 +317,7 @@ buf_init_loop:
 	jmp buf_init_loop
 
 buf_init_end:
-	# If initialization will be needed not only in add_recoed_ask 
+	# If initialization will be needed not only in add_record_ask 
 	# (state from the stack should be added in this case)
 	movb $10, data_buffer - 1(%edi)
 
