@@ -15,18 +15,18 @@ manual:
 	.ascii "│                  + │ given file_name                         │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ view <file_name>   │ Lets user view the file with a given    │\n"
-	.ascii "│                    │ file_name                               │\n"
+	.ascii "│                  + │ file_name                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
-	.ascii "│ add record         │ Adds a new record to already opened     │\n"
-	.ascii "│        <file_name> │ data file with a gven file_name         │\n"
+	.ascii "│ add record         │ Adds a new record to the end of already │\n"
+	.ascii "│      <file_name> + │ opened data file with a gven file_name  │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ change record      │ Changes record in already opened data   │\n"
-	.ascii "│        <file_name> │ file with a gven file_name. Number of   │\n"
+	.ascii "│      <file_name>   │ file with a gven file_name. Number of   │\n"
 	.ascii "│                    │ the record would be asked after running │\n"
 	.ascii "│                    │ a command                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ delete record      │ Deletes record in already opened data   │\n"
-	.ascii "│        <file_name> │ file with a gven file_name. Number of   │\n"
+	.ascii "│      <file_name>   │ file with a gven file_name. Number of   │\n"
 	.ascii "│                    │ the record would be asked after running │\n"
 	.ascii "│                    │ a command                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
@@ -34,9 +34,6 @@ manual:
 	.ascii "│                  + │ file_name                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ exit             + │ Exits an application                    │\n"
-//	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
-//	.ascii "├──────────────────────────────────────────────────────────────┤\n"
-//	.ascii "├──────────────────────────────────────────────────────────────┤\n"
 	.asciz "├────────────────────┴─────────────────────────────────────────┘\n"
 manual_end:
 .equ manual_len, manual_end - manual
@@ -51,10 +48,10 @@ new_slash_new_line:
 new_slash_new_line_end:
 .equ new_slash_new_line_len, new_slash_new_line_end - new_slash_new_line
 
-slash_new_line:
-	.ascii "│\n"
-slash_new_line_end:
-.equ slash_new_line_len, slash_new_line_end - slash_new_line
+slash_line:
+	.ascii "│ \0"
+slash_line_end:
+.equ slash_line_len, slash_line_end - slash_line
 
 new_line:
 	.ascii "\n"
@@ -204,12 +201,12 @@ slash_new_slash_line_func:
 	int $LINUX_SYSCALL
 	ret
 
-.globl slash_new_line_func
-.type slash_new_line_func, @function
-slash_new_line_func:
+.globl slash_line_func
+.type slash_line_func, @function
+slash_line_func:
 	movl $STDOUT, %ebx
-	movl $slash_new_line, %ecx 
-	movl $slash_new_line_len, %edx 
+	movl $slash_line, %ecx 
+	movl $slash_line_len, %edx 
 	movl $SYS_WRITE, %eax 
 	int $LINUX_SYSCALL
 	ret

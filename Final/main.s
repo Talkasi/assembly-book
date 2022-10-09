@@ -123,7 +123,7 @@ not_closed_error_line_end:
 
 # Buffers block
 .equ RECORD_SIZE, 100
-.equ DATA_SIZE, 120
+.equ DATA_SIZE, 130
 .equ OPENED_FILE_NAME_SIZE, 50
 .section .bss
 	.lcomm record_buffer, RECORD_SIZE
@@ -309,7 +309,7 @@ open_ask:
 
 	jmp waiting_for_user
 
-view_ask:												#TODO: view all records in file
+view_ask:
 	pushl $DATA_SIZE
 	pushl $data_buffer
 	call buf_init
@@ -327,13 +327,25 @@ view_ask:												#TODO: view all records in file
 	cmpl $0, OPENED_FLAG(%ebp)
 	je not_opened_error
 
+	call slash_new_slash_line_func
+
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $SYS_LSEEK, %eax
+	movl $0, %ecx
+	movl $0, %edx
+	int $LINUX_SYSCALL
+
+	jmp view_ask_loop
+
+view_ask_loop:
 	movl DESCRIPTOR_POSITION(%ebp), %ebx
 	movl $SYS_READ, %eax
 	movl $data_buffer, %ecx
 	movl $DATA_SIZE, %edx
 	int $LINUX_SYSCALL
 
-	call slash_new_slash_line_func
+	cmpl $0, %eax
+	jle view_ask_end
 
 	movl $STDOUT, %ebx
 	movl $data_buffer, %ecx
@@ -341,17 +353,25 @@ view_ask:												#TODO: view all records in file
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	call new_slash_new_line_func
+	call slash_line_func
+	jmp view_ask_loop
 
-	#			- count number of records to make view command work normally
+view_ask_end:
+	call new_slash_new_line_func
 
 	jmp waiting_for_user
 
-add_record_ask:											#TODO: add record to the end of file
+add_record_ask:
 	pushl $DATA_SIZE
 	pushl $data_buffer
 	call buf_init
 	addl $8, %esp
+
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $SYS_LSEEK, %eax
+	movl $0, %ecx
+	movl $2, %edx
+	int $LINUX_SYSCALL
 
 	pushl $0
 	pushl $record_buffer + 11
