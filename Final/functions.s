@@ -3,19 +3,53 @@
 
 manual:
 	.ascii "│\n"
-	.ascii "├────────────────────┬────────────────────────────────────────┐\n"
-	.ascii "├─────  Command  ────┼────────────  Description  ─────────────┤\n"
-	.ascii "├────────────────────┼────────────────────────────────────────┤\n"
-	.ascii "│ create <file_name> │ Creates a new data file with a given   │\n"
-	.ascii "│                    │ file_name                              │\n"
-	.ascii "├────────────────────┼────────────────────────────────────────┤\n"
-	.ascii "│ manual             │ Lists all the commands supported       │\n"
-	.ascii "├────────────────────┼────────────────────────────────────────┤\n"
-	.ascii "│ exit               │ Exits an application                   │\n"
-	.asciz "├────────────────────┴────────────────────────────────────────┘\n"
-
+	.ascii "├────────────────────┬─────────────────────────────────────────┐\n"
+	.ascii "├─────  Command  ────┼─────────────  Description  ─────────────┤\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ manual             │ Lists all the commands supported        │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ create <file_name> │ Creates a new data file with a given    │\n"
+	.ascii "│                    │ file_name                               │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ open <file_name>   │ Opens already created data file with a  │\n"
+	.ascii "│                    │ given file_name                         │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ view <file_name>   │ Lets user view the file with a given    │\n"
+	.ascii "│                    │ file_name                               │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ add record         │ Adds a new record to already opened     │\n"
+	.ascii "│        <file_name> │ data file with a gven file_name         │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ change record      │ Changes record in already opened data   │\n"
+	.ascii "│        <file_name> │ file with a gven file_name. Number of   │\n"
+	.ascii "│                    │ the record would be asked after running │\n"
+	.ascii "│                    │ a command                               │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ delete record      │ Deletes record in already opened data   │\n"
+	.ascii "│        <file_name> │ file with a gven file_name. Number of   │\n"
+	.ascii "│                    │ the record would be asked after running │\n"
+	.ascii "│                    │ a command                               │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ close <file_name>  │ Close opend data file with a given      │\n"
+	.ascii "│                    │ file_name                               │\n"
+	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+	.ascii "│ exit               │ Exits an application                    │\n"
+//	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
+//	.ascii "├──────────────────────────────────────────────────────────────┤\n"
+//	.ascii "├──────────────────────────────────────────────────────────────┤\n"
+	.asciz "├────────────────────┴─────────────────────────────────────────┘\n"
 manual_end:
 .equ manual_len, manual_end - manual
+
+slash_new_slash_line:
+	.ascii "│\n│ "
+slash_new_slash_line_end:
+.equ slash_new_slash_line_len, slash_new_slash_line_end - slash_new_slash_line
+
+new_slash_new_line:
+	.ascii "\n│\n"
+new_slash_new_line_end:
+.equ new_slash_new_line_len, new_slash_new_line_end - new_slash_new_line
 
 new_line:
 	.ascii "\n"
@@ -89,3 +123,23 @@ cmp_status_exit:
 cmp_exit:
 	movl %edi, %eax
 	ret	
+
+.globl new_slash_new_line_func
+.type new_slash_new_line_func, @function
+new_slash_new_line_func:
+	movl $STDOUT, %ebx
+	movl $new_slash_new_line, %ecx 
+	movl $new_slash_new_line_len, %edx 
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
+	ret
+
+.globl slash_new_slash_line_func
+.type slash_new_slash_line_func, @function
+slash_new_slash_line_func:
+	movl $STDOUT, %ebx
+	movl $slash_new_slash_line, %ecx 
+	movl $slash_new_slash_line_len, %edx 
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
+	ret
