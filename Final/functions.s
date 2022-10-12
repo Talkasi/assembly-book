@@ -18,15 +18,15 @@ manual:
 	.ascii "│                  + │ file_name                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ add record         │ Adds a new record to the end of already │\n"
-	.ascii "│      <file_name> + │ opened data file with a gven file_name  │\n"
+	.ascii "│      <file_name> + │ opened data file with a given file_name │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ change record      │ Changes record in already opened data   │\n"
-	.ascii "│      <file_name>   │ file with a gven file_name. Number of   │\n"
+	.ascii "│      <file_name>   │ file with a given file_name. Number of  │\n"
 	.ascii "│                    │ the record would be asked after running │\n"
 	.ascii "│                    │ a command                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ delete record      │ Deletes record in already opened data   │\n"
-	.ascii "│      <file_name>   │ file with a gven file_name. Number of   │\n"
+	.ascii "│      <file_name>   │ file with a given file_name. Number of  │\n"
 	.ascii "│                    │ the record would be asked after running │\n"
 	.ascii "│                    │ a command                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
@@ -37,6 +37,17 @@ manual:
 	.asciz "├────────────────────┴─────────────────────────────────────────┘\n"
 manual_end:
 .equ manual_len, manual_end - manual
+
+
+# Errors line block
+create_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not created.\n"
+	.ascii "│ - Try to change file_name or directory to solve this problem.\n"
+	.ascii "│\n"
+create_error_line_end:
+.equ create_error_line_len, create_error_line_end - create_error_line
+
 
 slash_new_slash_line:
 	.ascii "│\n│ "
@@ -121,18 +132,40 @@ cmp_exit:
 	movl %edi, %eax
 	ret	
 
-/*
-main PROC
-    mov  esi,OFFSET source              
-    mov  edi,OFFSET target             
-L1:
-    mov  al,[esi]       
-    mov  [edi],al       
-    inc  esi            
-    inc  edi            
-    test al,al          ; you could also use  cmp al,0  if you prefer that
-    JNZ L1              ; repeat the loop if al != 0
-*/
+
+.globl create_func
+.type create_func, @function
+create_func:
+	movl $SYS_OPEN, %eax
+	movl 4(%esp), %ebx
+	movl $2, %ecx
+	movl $0777, %edx
+	int $LINUX_SYSCALL
+
+	cmpl $0, %eax 
+	jnl create_error
+
+	movl $SYS_CREATE, %eax
+	movl 4(%esp), %ebx
+	movl $0777, %ecx
+	int $LINUX_SYSCALL
+
+	jmp create_exit
+
+create_error:
+	# Print error message
+	movl $STDOUT, %ebx
+	movl $create_error_line, %ecx
+	movl $create_error_line_len, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	jmp create_exit
+
+create_exit:
+	movl $1, %eax
+	ret
+
 
 .globl cpy_str
 .type cpy_str, @function

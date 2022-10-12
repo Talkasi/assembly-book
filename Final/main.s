@@ -1,6 +1,9 @@
 .include "definitions.s"
 .section .data
 
+id_value:
+	.int 00000
+
 # Lines to print block
 hi_line:
 	.ascii "┌─────────────────────────────────────────────────────────────┐\n"
@@ -70,6 +73,7 @@ close_command:
 new_line:
 	.ascii "\n"
 
+
 # Errors line block
 command_error_line:
 	.ascii "│\n"
@@ -78,14 +82,6 @@ command_error_line:
 	.ascii "│ Here is a list of all commands supported:\n"
 command_error_line_end:
 .equ command_error_line_len, command_error_line_end - command_error_line
-
-create_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. File was not created.\n"
-	.ascii "│ - Try to change file_name or directory to solve this problem.\n"
-	.ascii "│\n"
-create_error_line_end:
-.equ create_error_line_len, create_error_line_end - create_error_line
 
 open_error_line:
 	.ascii "│\n"
@@ -130,11 +126,13 @@ not_closed_error_line_end:
 	.lcomm data_buffer, DATA_SIZE
 	.lcomm opened_file_name_buffer, OPENED_FILE_NAME_SIZE
 
-.equ CAR_MODEL_POSITION, 0
-.equ LICENSE_PLATE_POSITION, 25
-.equ MANUFACTURE_YEAR_POSITION, 40
-.equ OWNER_POSITION, 49
+.equ ID_POSITION, 0
+.equ CAR_MODEL_POSITION, 10
+.equ LICENSE_PLATE_POSITION, 35
+.equ MANUFACTURE_YEAR_POSITION, 50
+.equ OWNER_POSITION, 59
 
+.equ ID_LEN, 5
 .equ CAR_MODEL_LEN, 21
 .equ LICENSE_PLATE_LEN, 11
 .equ MANUFACTURE_YEAR_LEN, 5
@@ -264,19 +262,9 @@ man_ask:
 	jmp waiting_for_user 
 
 create_ask:
-	movl $SYS_OPEN, %eax
-	movl $record_buffer + 7, %ebx
-	movl $2, %ecx
-	movl $0777, %edx
-	int $LINUX_SYSCALL
-
-	cmpl $0, %eax 
-	jnl create_error
-
-	movl $SYS_CREATE, %eax
-	movl $record_buffer + 7, %ebx
-	movl $0777, %ecx
-	int $LINUX_SYSCALL
+	pushl $record_buffer + 7
+	call create_func
+	addl $4, %esp
 
 	jmp waiting_for_user
 
@@ -361,6 +349,7 @@ view_ask_end:
 
 	jmp waiting_for_user
 
+
 add_record_ask:
 	pushl $DATA_SIZE
 	pushl $data_buffer
@@ -370,7 +359,7 @@ add_record_ask:
 	movl DESCRIPTOR_POSITION(%ebp), %ebx
 	movl $SYS_LSEEK, %eax
 	movl $0, %ecx
-	movl $2, %edx
+	movl $0, %edx
 	int $LINUX_SYSCALL
 
 	pushl $0
@@ -384,6 +373,42 @@ add_record_ask:
 
 	cmpl $0, OPENED_FLAG(%ebp)
 	je not_opened_error
+
+	movl $0, %edi
+	jmp count_id_loop
+
+count_id_loop:
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $SYS_READ, %eax
+	movl $data_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	int $LINUX_SYSCALL
+
+	cmpl $0, %eax
+	jle add_record_end
+
+	incl %edi
+
+	jmp count_id_loop
+
+add_record_end:
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
+
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $SYS_LSEEK, %eax
+	movl $0, %ecx
+	movl $2, %edx
+	int $LINUX_SYSCALL
+
+	# Write ID into a data buffer
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl %edi, %ecx 
+	movl $ID_LEN, %edx
+	movl $SYS_WRITE, %eax 
+	int $LINUX_SYSCALL
 
 	# Ask for a car model
 	movl $STDOUT, %ebx
@@ -457,7 +482,7 @@ add_record_ask:
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	call new_slash_new_line_func
+	//call slash_new_line_func
 
 	# Write into a file
 	movl DESCRIPTOR_POSITION(%ebp), %ebx
@@ -514,18 +539,6 @@ exit_ask:
 	movl $0, %ebx
 	movl $SYS_EXIT, %eax
 	int $LINUX_SYSCALL
-
-
-# Errors block
-create_error:
-	# Print error message
-	movl $STDOUT, %ebx
-	movl $create_error_line, %ecx
-	movl $create_error_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
-
-	jmp waiting_for_user
 
 open_error:
 	# Print error message
