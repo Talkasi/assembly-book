@@ -73,6 +73,21 @@ close_command:
 new_line:
 	.ascii "\n"
 
+slash_new_slash_line:
+	.ascii "│\n│ "
+slash_new_slash_line_end:
+.equ slash_new_slash_line_len, slash_new_slash_line_end - slash_new_slash_line
+
+new_slash_new_line:
+	.ascii "\n│\n"
+new_slash_new_line_end:
+.equ new_slash_new_line_len, new_slash_new_line_end - new_slash_new_line
+
+slash_line:
+	.ascii "│ \0"
+slash_line_end:
+.equ slash_line_len, slash_line_end - slash_line
+
 
 # Errors line block
 command_error_line:
@@ -146,11 +161,10 @@ _start:
 	movl %esp, %ebp
 
 	# Print the first hi-line in terminal
-	movl $STDOUT, %ebx
-	movl $hi_line, %ecx
-	movl $hi_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $hi_line_len
+	pushl $hi_line
+	call print_func
+	addl $8, %esp
 
 	# To check if file is opened at the moment
 	.equ OPENED_FLAG, -4
@@ -160,18 +174,16 @@ _start:
 # Main loop
 waiting_for_user:
 	# Print query line in terminal
-	movl $STDOUT, %ebx
-	movl $ask_user_line, %ecx
-	movl $ask_user_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $ask_user_line_len
+	pushl $ask_user_line
+	call print_func
+	addl $8, %esp
 
 	# Get the information from the terminal to the buffer
-	movl $STDIN, %ebx
-	movl $record_buffer, %ecx
-	movl $RECORD_SIZE, %edx
-	movl $SYS_READ, %eax
-	int $LINUX_SYSCALL
+	pushl $RECORD_SIZE
+	pushl $record_buffer
+	call scan_func
+	addl $8, %esp 
 
 	movl $0, record_buffer - 1(%eax)
 
@@ -315,7 +327,10 @@ view_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
 	je not_opened_error
 
-	call slash_new_slash_line_func
+	pushl $slash_new_slash_line_len
+	pushl $slash_new_slash_line
+	call print_func
+	addl $8, %esp
 
 	movl DESCRIPTOR_POSITION(%ebp), %ebx
 	movl $SYS_LSEEK, %eax
@@ -335,17 +350,23 @@ view_ask_loop:
 	cmpl $0, %eax
 	jle view_ask_end
 
-	movl $STDOUT, %ebx
-	movl $data_buffer, %ecx
-	movl $DATA_SIZE, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call print_func
+	addl $8, %esp
 
-	call slash_line_func
+	pushl $slash_line_len
+	pushl $slash_line
+	call print_func
+	addl $8, %esp 
+
 	jmp view_ask_loop
 
 view_ask_end:
-	call new_slash_new_line_func
+	pushl $new_slash_new_line_len
+	pushl $new_slash_new_line
+	call print_func
+	addl $8, %esp
 
 	jmp waiting_for_user
 
@@ -374,7 +395,7 @@ add_record_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
 	je not_opened_error
 
-	movl $0, %edi
+	movl $id_value, %edi
 	jmp count_id_loop
 
 count_id_loop:
@@ -402,6 +423,11 @@ add_record_end:
 	movl $0, %ecx
 	movl $2, %edx
 	int $LINUX_SYSCALL
+/*
+	pushl $data_buffer
+	pushl %edi
+	call id_func
+	addl $8, %esp
 
 	# Write ID into a data buffer
 	movl DESCRIPTOR_POSITION(%ebp), %ebx
@@ -409,80 +435,72 @@ add_record_end:
 	movl $ID_LEN, %edx
 	movl $SYS_WRITE, %eax 
 	int $LINUX_SYSCALL
-
+*/
 	# Ask for a car model
-	movl $STDOUT, %ebx
-	movl $car_model_line, %ecx 
-	movl $car_model_line_len, %edx 
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $car_model_line_len
+	pushl $car_model_line
+	call print_func
+	addl $8, %esp
 
 	# Write car model into a data buffer
-	movl $STDIN, %ebx
-	movl $data_buffer + CAR_MODEL_POSITION, %ecx 
-	movl $CAR_MODEL_LEN, %edx
-	movl $SYS_READ, %eax 
-	int $LINUX_SYSCALL
+	pushl $CAR_MODEL_LEN
+	pushl $data_buffer + CAR_MODEL_POSITION
+	call scan_func
+	addl $8, %esp
 
 	movb $32, data_buffer + CAR_MODEL_POSITION - 1(%eax)
 
 	# Ask for a licence plate
-	movl $STDOUT, %ebx
-	movl $license_plate_line, %ecx 
-	movl $license_plate_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
+	pushl $license_plate_line_len
+	pushl $license_plate_line
+	call print_func
+	addl $8, %esp
 
 	# Write licence plate into a data buffer
-	movl $STDIN, %ebx
-	movl $data_buffer + LICENSE_PLATE_POSITION, %ecx 
-	movl $LICENSE_PLATE_LEN, %edx
-	movl $SYS_READ, %eax 
-	int $LINUX_SYSCALL
+	pushl $LICENSE_PLATE_LEN
+	pushl $data_buffer + LICENSE_PLATE_POSITION
+	call scan_func
+	addl $8, %esp
 
 	movb $32, data_buffer + LICENSE_PLATE_POSITION - 1(%eax)
 
 	# Ask for a manufacture year
-	movl $STDOUT, %ebx
-	movl $manufacture_year_line, %ecx 
-	movl $manufacture_year_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
+	pushl $manufacture_year_line_len
+	pushl $manufacture_year_line
+	call print_func
+	addl $8, %esp
 
 	# Write manufacture year into a data buffer
-	movl $STDIN, %ebx
-	movl $data_buffer + MANUFACTURE_YEAR_POSITION, %ecx 
-	movl $MANUFACTURE_YEAR_LEN, %edx
-	movl $SYS_READ, %eax 
-	int $LINUX_SYSCALL
+	pushl $MANUFACTURE_YEAR_LEN
+	pushl $data_buffer + MANUFACTURE_YEAR_POSITION
+	call scan_func
+	addl $8, %esp
 
 	movb $32, data_buffer + MANUFACTURE_YEAR_POSITION - 1(%eax)
 
 	# Ask for an owner's name
-	movl $STDOUT, %ebx
-	movl $owner_line, %ecx 
-	movl $owner_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
+	pushl $owner_line_len
+	pushl $owner_line
+	call print_func
+	addl $8, %esp
 
 	# Write owner's name into a data buffer
-	movl $STDIN, %ebx
-	movl $data_buffer + OWNER_POSITION, %ecx 
-	movl $OWNER_LEN, %edx
-	movl $SYS_READ, %eax 
-	int $LINUX_SYSCALL	
+	pushl $OWNER_LEN
+	pushl $data_buffer + OWNER_POSITION
+	call scan_func
+	addl $8, %esp	
 
 	movb $32, data_buffer + OWNER_POSITION - 1(%eax)
 
-	call slash_new_slash_line_func
+	pushl $slash_new_slash_line_len
+	pushl $slash_new_slash_line
+	call print_func
+	addl $8, %esp
 
-	movl $STDOUT, %ebx
-	movl $data_buffer, %ecx
-	movl $DATA_SIZE, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
-
-	//call slash_new_line_func
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call print_func
+	addl $8, %esp
 
 	# Write into a file
 	movl DESCRIPTOR_POSITION(%ebp), %ebx
@@ -490,6 +508,11 @@ add_record_end:
 	movl $DATA_SIZE, %edx
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
+
+	pushl $slash_new_slash_line_len
+	pushl $slash_new_slash_line
+	call print_func
+	addl $8, %esp
 
 	jmp waiting_for_user
 
@@ -527,11 +550,10 @@ exit_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
 	jne not_closed_error
 
-	movl $STDOUT, %ebx
-	movl $exit_line, %ecx
-	movl $exit_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $exit_line_len
+	pushl $exit_line
+	call print_func
+	addl $8, %esp
 
 	movl %ebp, %esp
 	popl %ebp
@@ -542,40 +564,36 @@ exit_ask:
 
 open_error:
 	# Print error message
-	movl $STDOUT, %ebx
-	movl $open_error_line, %ecx
-	movl $open_error_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $open_error_line_len
+	pushl $open_error_line
+	call print_func
+	addl $8, %esp
 
 	jmp waiting_for_user
 
 not_opened_error:
 	# Print error message
-	movl $STDOUT, %ebx
-	movl $not_opened_error_line, %ecx
-	movl $not_opened_error_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $not_opened_error_line_len
+	pushl $not_opened_error_line
+	call print_func
+	addl $8, %esp
 
 	jmp waiting_for_user
 
 close_error:
 	# Print error message
-	movl $STDOUT, %ebx
-	movl $close_error_line, %ecx
-	movl $close_error_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $close_error_line_len
+	pushl $close_error_line
+	call print_func
+	addl $8, %esp
 
 	jmp waiting_for_user
 
 not_closed_error:
 	# Print error message
-	movl $STDOUT, %ebx
-	movl $not_closed_error_line, %ecx
-	movl $not_closed_error_line_len, %edx
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+	pushl $not_closed_error_line_len
+	pushl $not_closed_error_line
+	call print_func
+	addl $8, %esp
 
 	jmp waiting_for_user

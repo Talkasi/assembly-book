@@ -48,25 +48,46 @@ create_error_line:
 create_error_line_end:
 .equ create_error_line_len, create_error_line_end - create_error_line
 
+command_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. TasIApp doesn't support this command.\n"
+	.ascii "│\n"
+	.ascii "│ Here is a list of all commands supported:\n"
+command_error_line_end:
+.equ command_error_line_len, command_error_line_end - command_error_line
 
-slash_new_slash_line:
-	.ascii "│\n│ "
-slash_new_slash_line_end:
-.equ slash_new_slash_line_len, slash_new_slash_line_end - slash_new_slash_line
+open_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not opened.\n"
+	.ascii "│ - You should create file before open it.\n"
+	.ascii "│ - Only one file can be opened at a time.\n"
+	.ascii "│ Close the file you're working with to open another one.\n"
+	.ascii "│\n"
+open_error_line_end:
+.equ open_error_line_len, open_error_line_end - open_error_line
 
-new_slash_new_line:
-	.ascii "\n│\n"
-new_slash_new_line_end:
-.equ new_slash_new_line_len, new_slash_new_line_end - new_slash_new_line
+not_opened_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not opened.\n"
+	.ascii "│ - You should open file before dealing with it.\n"
+	.ascii "│\n"
+not_opened_error_line_end:
+.equ not_opened_error_line_len, not_opened_error_line_end - not_opened_error_line
 
-slash_line:
-	.ascii "│ \0"
-slash_line_end:
-.equ slash_line_len, slash_line_end - slash_line
+close_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. File was not closed.\n"
+	.ascii "│ - Only opened files can be closed\n"
+	.ascii "│\n"
+close_error_line_end:
+.equ close_error_line_len, close_error_line_end - close_error_line
 
-new_line:
-	.ascii "\n"
-
+not_closed_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. Close opened file to exit TasIApp.\n"
+	.ascii "│\n"
+not_closed_error_line_end:
+.equ not_closed_error_line_len, not_closed_error_line_end - not_closed_error_line
 
 .section .text
 
@@ -166,6 +187,82 @@ create_exit:
 	movl $1, %eax
 	ret
 
+.equ FIRST_ARG, 4
+.equ SECOND_ARG, 8
+
+.globl print_func
+.type print_func, @function
+print_func:
+	movl $STDOUT, %ebx
+	movl FIRST_ARG(%esp), %ecx 		# line
+	movl SECOND_ARG(%esp), %edx		# len
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	ret
+
+.globl scan_func
+.type scan_func, @function
+scan_func:
+	movl $STDIN, %ebx
+	movl FIRST_ARG(%esp), %ecx 		# line
+	movl SECOND_ARG(%esp), %edx		# len
+	movl $SYS_READ, %eax
+	int $LINUX_SYSCALL
+
+	ret
+/*
+.globl id_func
+.type id_func, @function
+id_func:
+	.equ ID_ADDRESS, 4
+	movl ID_ADDRESS(%esp), %edx
+	movl DATA_ADDRESS(%esp), %edi
+	addl $4, %eax
+	movl $4, %edi
+
+	jmp id_loop 
+
+
+         mov    %edx, %eax
+         mov    $5, %ecx        ;  digit count to generate
+         
+loop1:   call   dividebyten
+         add    %eax, $0x30
+         push   %eax
+         mov    %edx, %eax
+         dec    %ecx
+         jne    loop1
+         mov    %5, %ecx        ;  digit count to print
+
+loop2:   pop    %eax
+         call   printcharacter
+         dec    %ecx
+         jne    loop2
+         
+id_loop:
+	div $10, %edx
+	mul $10, %edx
+	sub %edx, %ecx
+
+	addl $30, %edx
+
+	# Move digit to a data_buffer
+	movl %edx, %eax
+	subl %eax
+	dec %edi
+
+	div $10, %edx
+	div $10, %ecx
+
+	cmp $0, %edi
+	je id_end
+
+	jmp  id_loop
+
+id_end:
+	ret
+*/
 
 .globl cpy_str
 .type cpy_str, @function
@@ -213,33 +310,3 @@ buf_init_end:
 	movb $10, (%edx)
 	ret
 
-
-.globl new_slash_new_line_func
-.type new_slash_new_line_func, @function
-new_slash_new_line_func:
-	movl $STDOUT, %ebx
-	movl $new_slash_new_line, %ecx 
-	movl $new_slash_new_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
-	ret
-
-.globl slash_new_slash_line_func
-.type slash_new_slash_line_func, @function
-slash_new_slash_line_func:
-	movl $STDOUT, %ebx
-	movl $slash_new_slash_line, %ecx 
-	movl $slash_new_slash_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
-	ret
-
-.globl slash_line_func
-.type slash_line_func, @function
-slash_line_func:
-	movl $STDOUT, %ebx
-	movl $slash_line, %ecx 
-	movl $slash_line_len, %edx 
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
-	ret
