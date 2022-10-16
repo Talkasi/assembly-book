@@ -211,58 +211,49 @@ scan_func:
 	int $LINUX_SYSCALL
 
 	ret
-/*
+
 .globl id_func
 .type id_func, @function
 id_func:
-	.equ ID_ADDRESS, 4
-	movl ID_ADDRESS(%esp), %edx
-	movl DATA_ADDRESS(%esp), %edi
-	addl $4, %eax
-	movl $4, %edi
+	.equ ID, 4
+	.equ DATA, 8
+	movl DATA(%esp), %edi
+	addl $4, %edi
+	movl $0, %esi
 
 	jmp id_loop 
-
-
-         mov    %edx, %eax
-         mov    $5, %ecx        ;  digit count to generate
-         
-loop1:   call   dividebyten
-         add    %eax, $0x30
-         push   %eax
-         mov    %edx, %eax
-         dec    %ecx
-         jne    loop1
-         mov    %5, %ecx        ;  digit count to print
-
-loop2:   pop    %eax
-         call   printcharacter
-         dec    %ecx
-         jne    loop2
          
 id_loop:
-	div $10, %edx
-	mul $10, %edx
-	sub %edx, %ecx
+	movl $0, %edx
+	movl ID(%esp), %eax
+	movl $10, %ecx
+	div %ecx
+	# %eax store ID/10
+	# %edx store ID%10
+	movl %eax, ID(%esp)
 
-	addl $30, %edx
+	or %edx, %eax
+	cmp $0, %eax
+	je id_end_normal
 
-	# Move digit to a data_buffer
-	movl %edx, %eax
-	subl %eax
-	dec %edi
+	cmp $5, %esi
+	je id_end_wrong
 
-	div $10, %edx
-	div $10, %ecx
+	add $48, %edx 
+	movb %dl, (%edi)
 
-	cmp $0, %edi
-	je id_end
+	incl %esi 
+	decl %edi 
 
-	jmp  id_loop
+	jmp id_loop
 
-id_end:
+id_end_normal:
+	movl $1, %eax
 	ret
-*/
+
+id_end_wrong:
+	movl $0, %eax
+	ret
 
 .globl cpy_str
 .type cpy_str, @function

@@ -1,9 +1,6 @@
 .include "definitions.s"
 .section .data
 
-id_value:
-	.int 00000
-
 # Lines to print block
 hi_line:
 	.ascii "┌─────────────────────────────────────────────────────────────┐\n"
@@ -73,6 +70,11 @@ close_command:
 new_line:
 	.ascii "\n"
 
+slash_new_line:
+	.ascii "│\n"
+slash_new_line_end:
+.equ slash_new_line_len, slash_new_line_end - slash_new_line
+
 slash_new_slash_line:
 	.ascii "│\n│ "
 slash_new_slash_line_end:
@@ -115,6 +117,13 @@ not_opened_error_line:
 	.ascii "│\n"
 not_opened_error_line_end:
 .equ not_opened_error_line_len, not_opened_error_line_end - not_opened_error_line
+
+id_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. TasIApp doesn't support more than 99999 records in a file\n"
+	.ascii "│\n"
+id_error_line_end:
+.equ id_error_line_len, id_error_line_end - id_error_line
 
 close_error_line:
 	.ascii "│\n"
@@ -363,8 +372,8 @@ view_ask_loop:
 	jmp view_ask_loop
 
 view_ask_end:
-	pushl $new_slash_new_line_len
-	pushl $new_slash_new_line
+	pushl $1
+	pushl $new_line
 	call print_func
 	addl $8, %esp
 
@@ -395,7 +404,6 @@ add_record_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
 	je not_opened_error
 
-	movl $id_value, %edi
 	jmp count_id_loop
 
 count_id_loop:
@@ -407,8 +415,6 @@ count_id_loop:
 
 	cmpl $0, %eax
 	jle add_record_end
-
-	incl %edi
 
 	jmp count_id_loop
 
@@ -423,19 +429,20 @@ add_record_end:
 	movl $0, %ecx
 	movl $2, %edx
 	int $LINUX_SYSCALL
-/*
+
+	movl $0, %edx
+	movl $DATA_SIZE, %ecx
+	div %ecx
+	incl %eax
+
 	pushl $data_buffer
-	pushl %edi
+	pushl %eax
 	call id_func
 	addl $8, %esp
 
-	# Write ID into a data buffer
-	movl DESCRIPTOR_POSITION(%ebp), %ebx
-	movl %edi, %ecx 
-	movl $ID_LEN, %edx
-	movl $SYS_WRITE, %eax 
-	int $LINUX_SYSCALL
-*/
+	cmpl $0, %eax
+	je id_error
+
 	# Ask for a car model
 	pushl $car_model_line_len
 	pushl $car_model_line
@@ -509,8 +516,8 @@ add_record_end:
 	movl $SYS_WRITE, %eax
 	int $LINUX_SYSCALL
 
-	pushl $slash_new_slash_line_len
-	pushl $slash_new_slash_line
+	pushl $slash_new_line_len
+	pushl $slash_new_line
 	call print_func
 	addl $8, %esp
 
@@ -575,6 +582,14 @@ not_opened_error:
 	# Print error message
 	pushl $not_opened_error_line_len
 	pushl $not_opened_error_line
+	call print_func
+	addl $8, %esp
+
+	jmp waiting_for_user
+
+id_error:
+	pushl $id_error_line_len
+	pushl $id_error_line
 	call print_func
 	addl $8, %esp
 
