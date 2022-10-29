@@ -61,6 +61,9 @@ view_command:
 add_record_command:
 	.ascii "add record \0"
 
+change_record_command:
+	.ascii "change record \0"
+
 open_command:
 	.ascii "open \0"
 
@@ -118,12 +121,12 @@ not_opened_error_line:
 not_opened_error_line_end:
 .equ not_opened_error_line_len, not_opened_error_line_end - not_opened_error_line
 
-id_error_line:
+itoa_error_line:
 	.ascii "│\n"
 	.ascii "│ [!]Error. TasIApp doesn't support more than 99999 records in a file\n"
 	.ascii "│\n"
-id_error_line_end:
-.equ id_error_line_len, id_error_line_end - id_error_line
+itoa_error_line_end:
+.equ itoa_error_line_len, itoa_error_line_end - itoa_error_line
 
 close_error_line:
 	.ascii "│\n"
@@ -133,6 +136,13 @@ close_error_line:
 close_error_line_end:
 .equ close_error_line_len, close_error_line_end - close_error_line
 
+change_record_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. The record you want to change doesn't exist.\n"
+	.ascii "│\n"
+change_record_error_line_end:
+.equ change_record_error_line_len, change_record_error_line_end - change_record_error_line
+
 not_closed_error_line:
 	.ascii "│\n"
 	.ascii "│ [!]Error. Close opened file to exit TasIApp.\n"
@@ -140,6 +150,11 @@ not_closed_error_line:
 not_closed_error_line_end:
 .equ not_closed_error_line_len, not_closed_error_line_end - not_closed_error_line
 
+number_ask_line:
+	.ascii "│\n"
+	.ascii "│ Enter number of the record should be changed: "
+number_ask_line_end:
+.equ number_ask_line_len, number_ask_line_end - number_ask_line
 
 # Buffers block
 .equ RECORD_SIZE, 100
@@ -255,6 +270,16 @@ waiting_for_user:
 
 	cmpl $1, %eax
 	je open_ask
+
+	# Change record check, comparing + file_name existance check
+	pushl $1
+	pushl $change_record_command
+	pushl $record_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	#je change_record_ask
 
 	# Close file check, comparing + file_name existance check
 	pushl $1
@@ -437,11 +462,11 @@ add_record_end:
 
 	pushl $data_buffer
 	pushl %eax
-	call id_func
+	call itoa_func
 	addl $8, %esp
 
 	cmpl $0, %eax
-	je id_error
+	je itoa_error
 
 	# Ask for a car model
 	pushl $car_model_line_len
@@ -587,9 +612,9 @@ not_opened_error:
 
 	jmp waiting_for_user
 
-id_error:
-	pushl $id_error_line_len
-	pushl $id_error_line
+itoa_error:
+	pushl $itoa_error_line_len
+	pushl $itoa_error_line
 	call print_func
 	addl $8, %esp
 

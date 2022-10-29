@@ -212,18 +212,18 @@ scan_func:
 
 	ret
 
-.globl id_func
-.type id_func, @function
-id_func:
+.globl itoa_func
+.type itoa_func, @function
+itoa_func:
 	.equ ID, 4
 	.equ DATA, 8
 	movl DATA(%esp), %edi
 	addl $4, %edi
 	movl $0, %esi
 
-	jmp id_loop 
+	jmp itoa_loop 
          
-id_loop:
+itoa_loop:
 	movl $0, %edx
 	movl ID(%esp), %eax
 	movl $10, %ecx
@@ -234,10 +234,10 @@ id_loop:
 
 	or %edx, %eax
 	cmp $0, %eax
-	je id_end_normal
+	je itoa_end_normal
 
 	cmp $5, %esi
-	je id_end_wrong
+	je itoa_end_wrong
 
 	add $48, %edx 
 	movb %dl, (%edi)
@@ -245,15 +245,50 @@ id_loop:
 	incl %esi 
 	decl %edi 
 
-	jmp id_loop
+	jmp itoa_loop
 
-id_end_normal:
+itoa_end_normal:
 	movl $1, %eax
 	ret
 
-id_end_wrong:
+itoa_end_wrong:
 	movl $0, %eax
 	ret
+
+
+.globl atoi_func
+.type atoi_func, @function
+atoi_func:
+	.equ BUFF, 4
+	movl BUFF(%esp), %ebx
+	# 134
+	addl $3, %edx
+	movl $1, %edi
+	jmp atoi_loop
+
+atoi_loop:
+	cmpb $32, (%ebx)
+	je atoi_end
+
+	movl (%ebx), %eax
+	sub $48, %eax
+	mul %edi
+
+	add %eax, %ecx
+
+	decl %ebx
+
+	movl %edi, %eax
+	mov $10, %esi
+	mul %esi
+	movl %eax, %edi
+
+	jmp atoi_loop
+
+atoi_end:
+	movl %ecx, %eax
+	ret
+
 
 .globl cpy_str
 .type cpy_str, @function
