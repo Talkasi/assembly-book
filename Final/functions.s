@@ -293,28 +293,56 @@ itoa_end_wrong:
 .globl atoi_func
 .type atoi_func, @function
 atoi_func:
+	# Store given_string_start_position in the %ebx. Expecting string is a null-terminated number
+	.equ LEN, 8
 	.equ BUFF, 4
+	movl LEN(%esp), %esi
 	movl BUFF(%esp), %ebx
-	# 134
+
+	# NULL in the end of the string is not a number to count it in the length of the string
+	dec %esi
+	# There is a number should be multiplying by 10 ** 0, so lwngth - 1 is needed
+	dec %esi
+
+	# Compute 10 ** length
+	push %esi
+	push $10
+	call power_func
+	addl $8, %esp
+
+	# %edi stores 10 ** (current position of the number)
+	movl %eax, %edi
+
+	# %ecx stores an answer
 	movl $0, %ecx
-	movl $1, %edi
+
 	jmp atoi_loop
 
 atoi_loop:
-	cmpb $32, (%ebx)
+	# Comparing if current byte is NULL
+	cmpb $0, (%ebx)
+	# Exit if true
 	je atoi_end
 
+	# Set %eax to 0 to avoid rubish in the higher bytes of a register
+	movl $0, %eax
+	# Move lower byte of %ebx (current string with number) to %al
 	movb (%ebx), %al
+	# Receiving number from string with number (string - ascii code of 0)
 	sub $48, %al
+	# Multiplying %eax (current number) with ten ** power
 	mul %edi
 
+	# Add current result to the main result
 	add %eax, %ecx
 
+	# Set %ebx with the address of the next byte of the string (next number or space)
 	incl %ebx
 
+	# Dividing 10 ** power by ten
 	movl %edi, %eax
-	mov $10, %esi
-	mul %esi
+	movl $10, %esi
+	div %esi
 	movl %eax, %edi
 
 	jmp atoi_loop
@@ -322,6 +350,41 @@ atoi_loop:
 atoi_end:
 	movl %ecx, %eax
 	ret
+
+
+.globl power_func
+.type power_func, @function
+# First parameter from the stack is number_given
+# Second parameter from the stack is power_given
+
+# Returns number_given in power of power_given
+power_func:
+	# Stores power
+	movl 8(%esp), %esi
+	# Stores number
+	movl 4(%esp), %ecx
+	# Stores answer
+	movl $1, %edi
+
+	jmp power_loop
+
+power_loop:
+	# If %ebx <= 0 -> break
+	cmpl $0, %esi
+	jle power_end
+
+	# While esi >= 1 do
+	movl %edi, %eax
+	mul %ecx
+	movl %eax, %edi
+
+	dec %esi
+	jmp power_loop
+
+power_end:
+	movl %edi, %eax
+	ret
+
 
 .globl n_records_counter_func
 .type n_records_counter_func, @function

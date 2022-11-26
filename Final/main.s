@@ -470,23 +470,24 @@ change_record_ask:
 	call scan_func
 	addl $8, %esp
 
-	movl $32, data_buffer - 1(%eax)
+	movl $0, data_buffer - 1(%eax)
 
+	pushl %eax
 	pushl $data_buffer
 	call atoi_func
 	addl $4, %esp
-	#%eax stores # of the record user wants to change
-	//pushl %eax
+	# %eax stores # of the record user wants to change
+	pushl %eax
 
 	pushl $DATA_SIZE
 	pushl $data_buffer
 	pushl DESCRIPTOR_POSITION(%ebp)
 	call n_records_counter_func
 	addl $12, %esp
-	#%eax stores last record number exist
+	#% eax stores last record number exist
 
 	cmpl %eax, (%esp)
-	jb change_record_error
+	jl change_record_error
 	cmpl $1, (%esp)
 	jl change_record_error
 
