@@ -484,11 +484,12 @@ change_record_ask:
 	pushl DESCRIPTOR_POSITION(%ebp)
 	call n_records_counter_func
 	addl $12, %esp
-	#% eax stores last record number exist
+	# %eax stores last record number exist
 
-	cmpl %eax, (%esp)
-	jl change_record_error
-	cmpl $1, (%esp)
+	movl (%esp), %edx
+	cmpl %eax, %edx
+	jg change_record_error
+	cmpl $1, %edx
 	jl change_record_error
 
 

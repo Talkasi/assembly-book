@@ -340,6 +340,7 @@ atoi_loop:
 	incl %ebx
 
 	# Dividing 10 ** power by ten
+	movl $0, %edx
 	movl %edi, %eax
 	movl $10, %esi
 	div %esi
@@ -389,23 +390,37 @@ power_end:
 .globl n_records_counter_func
 .type n_records_counter_func, @function
 n_records_counter_func:
+	movl $0, %esi
+
 	movl 4(%esp), %ebx
+	movl $SYS_LSEEK, %eax
+	movl $0, %ecx
+	movl $0, %edx
+	int $LINUX_SYSCALL
+	
+	jmp n_records_counter_loop
+
+n_records_counter_loop:
+	movl 4(%esp), %ebx 		# descriptor
 	movl $SYS_READ, %eax
-	movl 8(%esp), %ecx
-	movl 12(%esp), %edx
+	movl 8(%esp), %ecx 		# start of a buffer
+	movl 12(%esp), %edx		# size of a buffer
 	int $LINUX_SYSCALL
 
-	cmpl $0, %eax
+	cmpl $0, %eax 			# %eax stores number of symbols was read from a file
 	jle end_counter_func
 
-	jmp n_records_counter_func
+	addl %eax, %esi 		# Count sum of symbols was read from a file
+
+	jmp n_records_counter_loop
 
 end_counter_func:
 	movl $0, %edx
-	movl 12(%esp), %ecx
+	movl %esi, %eax
+	movl 12(%esp), %ecx 	# Sum divided by 1 record length is the number of records
 	div %ecx
-	incl %eax
 
+	# Answer is already in %eax
 	ret
 
 
