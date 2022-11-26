@@ -23,28 +23,6 @@ exit_line:
 exit_line_end:
 .equ exit_line_len, exit_line_end - exit_line
 
-# Add record line block
-car_model_line:
-	.ascii "│\n"
-	.ascii "│ Enter model of the car: \0"
-car_model_line_end:
-.equ car_model_line_len, car_model_line_end - car_model_line
-
-license_plate_line:
-	.ascii "│ Enter license plate: \0"
-license_plate_line_end:
-.equ license_plate_line_len, license_plate_line_end - license_plate_line
-
-manufacture_year_line:
-	.ascii "│ Enter year of car manufacture: \0"
-manufacture_year_line_end:
-.equ manufacture_year_line_len, manufacture_year_line_end - manufacture_year_line
-
-owner_line:
-	.ascii "│ Enter owner of the car: \0"
-owner_line_end:
-.equ owner_line_len, owner_line_end - owner_line
-
 # Commands block to check what user wants
 manual_command:
 	.ascii "manual\0"
@@ -136,13 +114,6 @@ close_error_line:
 close_error_line_end:
 .equ close_error_line_len, close_error_line_end - close_error_line
 
-change_record_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. The record you want to change doesn't exist.\n"
-	.ascii "│\n"
-change_record_error_line_end:
-.equ change_record_error_line_len, change_record_error_line_end - change_record_error_line
-
 not_closed_error_line:
 	.ascii "│\n"
 	.ascii "│ [!]Error. Close opened file to exit TasIApp.\n"
@@ -150,11 +121,19 @@ not_closed_error_line:
 not_closed_error_line_end:
 .equ not_closed_error_line_len, not_closed_error_line_end - not_closed_error_line
 
+change_record_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. The record you want to change doesn't exist.\n"
+	.ascii "│\n"
+change_record_error_line_end:
+.equ change_record_error_line_len, change_record_error_line_end - change_record_error_line
+
 number_ask_line:
 	.ascii "│\n"
 	.ascii "│ Enter number of the record should be changed: "
 number_ask_line_end:
 .equ number_ask_line_len, number_ask_line_end - number_ask_line
+
 
 # Buffers block
 .equ RECORD_SIZE, 100
@@ -164,18 +143,6 @@ number_ask_line_end:
 	.lcomm record_buffer, RECORD_SIZE
 	.lcomm data_buffer, DATA_SIZE
 	.lcomm opened_file_name_buffer, OPENED_FILE_NAME_SIZE
-
-.equ ID_POSITION, 0
-.equ CAR_MODEL_POSITION, 10
-.equ LICENSE_PLATE_POSITION, 35
-.equ MANUFACTURE_YEAR_POSITION, 50
-.equ OWNER_POSITION, 59
-
-.equ ID_LEN, 5
-.equ CAR_MODEL_LEN, 21
-.equ LICENSE_PLATE_LEN, 11
-.equ MANUFACTURE_YEAR_LEN, 5
-.equ OWNER_LEN, 71
 
 .section .text
 
@@ -261,6 +228,16 @@ waiting_for_user:
 	cmpl $1, %eax 
 	je add_record_ask
 
+	# Change record check, comparing + file_name existance check
+	pushl $1
+	pushl $change_record_command
+	pushl $record_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	je change_record_ask
+
 	# Open file check, comparing + file_name existance check
 	pushl $1
 	pushl $open_command
@@ -270,16 +247,6 @@ waiting_for_user:
 
 	cmpl $1, %eax
 	je open_ask
-
-	# Change record check, comparing + file_name existance check
-	pushl $1
-	pushl $change_record_command
-	pushl $record_buffer
-	call cmp_str
-	addl $12, %esp
-
-	cmpl $1, %eax
-	#je change_record_ask
 
 	# Close file check, comparing + file_name existance check
 	pushl $1
@@ -429,21 +396,12 @@ add_record_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
 	je not_opened_error
 
-	jmp count_id_loop
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	pushl DESCRIPTOR_POSITION(%ebp)
+	call n_records_counter_func
+	addl $12, %esp
 
-count_id_loop:
-	movl DESCRIPTOR_POSITION(%ebp), %ebx
-	movl $SYS_READ, %eax
-	movl $data_buffer, %ecx
-	movl $DATA_SIZE, %edx
-	int $LINUX_SYSCALL
-
-	cmpl $0, %eax
-	jle add_record_end
-
-	jmp count_id_loop
-
-add_record_end:
 	pushl $DATA_SIZE
 	pushl $data_buffer
 	call buf_init
@@ -468,61 +426,9 @@ add_record_end:
 	cmpl $0, %eax
 	je itoa_error
 
-	# Ask for a car model
-	pushl $car_model_line_len
-	pushl $car_model_line
-	call print_func
-	addl $8, %esp
-
-	# Write car model into a data buffer
-	pushl $CAR_MODEL_LEN
-	pushl $data_buffer + CAR_MODEL_POSITION
-	call scan_func
-	addl $8, %esp
-
-	movb $32, data_buffer + CAR_MODEL_POSITION - 1(%eax)
-
-	# Ask for a licence plate
-	pushl $license_plate_line_len
-	pushl $license_plate_line
-	call print_func
-	addl $8, %esp
-
-	# Write licence plate into a data buffer
-	pushl $LICENSE_PLATE_LEN
-	pushl $data_buffer + LICENSE_PLATE_POSITION
-	call scan_func
-	addl $8, %esp
-
-	movb $32, data_buffer + LICENSE_PLATE_POSITION - 1(%eax)
-
-	# Ask for a manufacture year
-	pushl $manufacture_year_line_len
-	pushl $manufacture_year_line
-	call print_func
-	addl $8, %esp
-
-	# Write manufacture year into a data buffer
-	pushl $MANUFACTURE_YEAR_LEN
-	pushl $data_buffer + MANUFACTURE_YEAR_POSITION
-	call scan_func
-	addl $8, %esp
-
-	movb $32, data_buffer + MANUFACTURE_YEAR_POSITION - 1(%eax)
-
-	# Ask for an owner's name
-	pushl $owner_line_len
-	pushl $owner_line
-	call print_func
-	addl $8, %esp
-
-	# Write owner's name into a data buffer
-	pushl $OWNER_LEN
-	pushl $data_buffer + OWNER_POSITION
-	call scan_func
-	addl $8, %esp	
-
-	movb $32, data_buffer + OWNER_POSITION - 1(%eax)
+	pushl $data_buffer
+	call record_func
+	addl $4, %esp
 
 	pushl $slash_new_slash_line_len
 	pushl $slash_new_slash_line
@@ -547,6 +453,47 @@ add_record_end:
 	addl $8, %esp
 
 	jmp waiting_for_user
+
+change_record_ask:
+	pushl $number_ask_line_len
+	pushl $number_ask_line
+	call print_func
+	addl $8, %esp 
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp 
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call scan_func
+	addl $8, %esp
+
+	movl $32, data_buffer - 1(%eax)
+
+	pushl $data_buffer
+	call atoi_func
+	addl $4, %esp
+	#%eax stores # of the record user wants to change
+	//pushl %eax
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	pushl DESCRIPTOR_POSITION(%ebp)
+	call n_records_counter_func
+	addl $12, %esp
+	#%eax stores last record number exist
+
+	cmpl %eax, (%esp)
+	jb change_record_error
+	cmpl $1, (%esp)
+	jl change_record_error
+
+
+
+	jmp waiting_for_user
+	
 
 close_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
@@ -615,6 +562,14 @@ not_opened_error:
 itoa_error:
 	pushl $itoa_error_line_len
 	pushl $itoa_error_line
+	call print_func
+	addl $8, %esp
+
+	jmp waiting_for_user
+
+change_record_error:
+	pushl $change_record_error_line_len
+	pushl $change_record_error_line
 	call print_func
 	addl $8, %esp
 

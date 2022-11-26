@@ -89,6 +89,40 @@ not_closed_error_line:
 not_closed_error_line_end:
 .equ not_closed_error_line_len, not_closed_error_line_end - not_closed_error_line
 
+# Add record line block
+car_model_line:
+	.ascii "│\n"
+	.ascii "│ Enter model of the car: \0"
+car_model_line_end:
+.equ car_model_line_len, car_model_line_end - car_model_line
+
+license_plate_line:
+	.ascii "│ Enter license plate: \0"
+license_plate_line_end:
+.equ license_plate_line_len, license_plate_line_end - license_plate_line
+
+manufacture_year_line:
+	.ascii "│ Enter year of car manufacture: \0"
+manufacture_year_line_end:
+.equ manufacture_year_line_len, manufacture_year_line_end - manufacture_year_line
+
+owner_line:
+	.ascii "│ Enter owner of the car: \0"
+owner_line_end:
+.equ owner_line_len, owner_line_end - owner_line
+
+.equ ID_POSITION, 0
+.equ CAR_MODEL_POSITION, 10
+.equ LICENSE_PLATE_POSITION, 35
+.equ MANUFACTURE_YEAR_POSITION, 50
+.equ OWNER_POSITION, 59
+
+.equ ID_LEN, 5
+.equ CAR_MODEL_LEN, 21
+.equ LICENSE_PLATE_LEN, 11
+.equ MANUFACTURE_YEAR_LEN, 5
+.equ OWNER_LEN, 71
+
 .section .text
 
 .globl print_man
@@ -237,7 +271,7 @@ itoa_loop:
 	je itoa_end_normal
 
 	cmp $5, %esi
-	je itoa_end_wrong
+	je itoa_end_normal
 
 	add $48, %edx 
 	movb %dl, (%edi)
@@ -262,7 +296,7 @@ atoi_func:
 	.equ BUFF, 4
 	movl BUFF(%esp), %ebx
 	# 134
-	addl $3, %edx
+	movl $0, %ecx
 	movl $1, %edi
 	jmp atoi_loop
 
@@ -270,13 +304,13 @@ atoi_loop:
 	cmpb $32, (%ebx)
 	je atoi_end
 
-	movl (%ebx), %eax
-	sub $48, %eax
+	movb (%ebx), %al
+	sub $48, %al
 	mul %edi
 
 	add %eax, %ecx
 
-	decl %ebx
+	incl %ebx
 
 	movl %edi, %eax
 	mov $10, %esi
@@ -287,6 +321,119 @@ atoi_loop:
 
 atoi_end:
 	movl %ecx, %eax
+	ret
+
+.globl n_records_counter_func
+.type n_records_counter_func, @function
+n_records_counter_func:
+	movl 4(%esp), %ebx
+	movl $SYS_READ, %eax
+	movl 8(%esp), %ecx
+	movl 12(%esp), %edx
+	int $LINUX_SYSCALL
+
+	cmpl $0, %eax
+	jle end_counter_func
+
+	jmp n_records_counter_func
+
+end_counter_func:
+	movl $0, %edx
+	movl 12(%esp), %ecx
+	div %ecx
+	incl %eax
+
+	ret
+
+
+.globl record_func 
+.type record_func, @function
+record_func:
+	pushl %ebp
+	movl %esp, %ebp
+	.equ DATA, 8
+	movl DATA(%ebp), %edi
+
+	# Ask for a car model
+	pushl $car_model_line_len
+	pushl $car_model_line
+	call print_func
+	addl $8, %esp
+
+	#	data_buffer		ret_addr	ebp		esp
+
+	# Write car model into a data buffer
+	pushl $CAR_MODEL_LEN
+	addl $CAR_MODEL_POSITION, DATA(%ebp)
+	pushl DATA(%ebp)
+	call scan_func
+	addl $8, %esp
+
+	add %eax, DATA(%ebp)
+	decl DATA(%ebp)
+	movl DATA(%ebp), %eax
+	movb $32, (%eax)
+
+
+	# Ask for a licence plate
+	pushl $license_plate_line_len
+	pushl $license_plate_line
+	call print_func
+	addl $8, %esp
+
+	# Write licence plate into a data buffer
+	movl %edi, DATA(%ebp)
+	pushl $LICENSE_PLATE_LEN
+	addl $LICENSE_PLATE_POSITION, DATA(%ebp)
+	pushl DATA(%ebp)
+	call scan_func
+	addl $8, %esp
+
+	decl DATA(%ebp)
+	addl %eax, DATA(%ebp)
+	movl DATA(%ebp), %eax
+	movb $32, (%eax)
+
+	# Ask for a manufacture year
+	pushl $manufacture_year_line_len
+	pushl $manufacture_year_line
+	call print_func
+	addl $8, %esp
+
+	# Write manufacture year into a data buffer
+	movl %edi, DATA(%ebp)
+	pushl $MANUFACTURE_YEAR_LEN
+	addl $MANUFACTURE_YEAR_POSITION, DATA(%ebp)
+	pushl DATA(%ebp)
+	call scan_func
+	addl $8, %esp
+
+	decl DATA(%ebp)
+	addl %eax, DATA(%ebp)
+	movl DATA(%ebp), %eax
+	movb $32, (%eax)
+
+	# Ask for an owner's name
+	pushl $owner_line_len
+	pushl $owner_line
+	call print_func
+	addl $8, %esp
+
+	# Write owner's name into a data buffer
+	movl %edi, DATA(%ebp)
+	pushl $OWNER_LEN
+	addl $OWNER_POSITION, DATA(%ebp)
+	pushl DATA(%ebp)
+	call scan_func
+	addl $8, %esp
+
+	decl DATA(%ebp)
+	addl %eax, DATA(%ebp)
+	movl DATA(%ebp), %eax
+	movb $32, (%eax)
+
+	movl %ebp, %esp
+	popl %ebp
 	ret
 
 
@@ -335,4 +482,3 @@ buf_init_end:
 	decl %edx
 	movb $10, (%edx)
 	ret
-
