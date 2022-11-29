@@ -16,6 +16,13 @@ ask_user_line:
 ask_user_line_end:
 .equ ask_user_line_len, ask_user_line_end - ask_user_line
 
+table_information_line:
+	.ascii "├────────┬────────────────────────┬──────────────┬────────┬─────────────────────────────────────────────────────────────────────────┐\n"
+	.ascii "│    #   │       Car model        │   Lisence #  │  Year  │                               Owners name                               │\n"
+	.asciz "├────────┴────────────────────────┴──────────────┴────────┴─────────────────────────────────────────────────────────────────────────┘\n"
+table_information_line_end:
+.equ table_information_line_len, table_information_line_end - table_information_line
+
 exit_line:
 	.ascii "├─────────────────────────────────────────────────────────────┐\n"
 	.ascii "├──────────────────────  Good bye! 🌚  ───────────────────────┤\n"
@@ -328,8 +335,13 @@ view_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
 	je not_opened_error
 
-	pushl $slash_new_slash_line_len
-	pushl $slash_new_slash_line
+	pushl $table_information_line_len
+	pushl $table_information_line
+	call print_func
+	addl $8, %esp 
+
+	pushl $slash_line_len
+	pushl $slash_line
 	call print_func
 	addl $8, %esp
 
@@ -454,6 +466,7 @@ add_record_ask:
 
 	jmp waiting_for_user
 
+
 change_record_ask:
 	pushl $number_ask_line_len
 	pushl $number_ask_line
@@ -470,7 +483,7 @@ change_record_ask:
 	call scan_func
 	addl $8, %esp
 
-	movl $0, data_buffer - 1(%eax)
+	movl $32, data_buffer - 1(%eax)
 
 	pushl %eax
 	pushl $data_buffer
@@ -486,16 +499,71 @@ change_record_ask:
 	addl $12, %esp
 	# %eax stores last record number exist
 
-	movl (%esp), %edx
-	cmpl %eax, %edx
+	cmpl %eax, (%esp)
 	jg change_record_error
-	cmpl $1, %edx
+	cmpl $1, (%esp)
 	jl change_record_error
 
+	# Make %eax store position of the cursor
+	decl (%esp)
+	movl $DATA_SIZE, %eax
+	movl (%esp), %ecx
+	mul %ecx
 
+	# Set cursor to the found position
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl %eax, %ecx
+	movl $SYS_LSEEK, %eax
+	movl $0, %edx
+	int $LINUX_SYSCALL
 
+	# Initialize buffer with spaces
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp 
+
+	# Write number of the record to a buffer
+	pushl $data_buffer
+	addl $1, 4(%esp)
+	pushl 4(%esp)
+	call itoa_func
+	addl $8, %esp
+
+	# Check an error
+	cmpl $0, %eax
+	je itoa_error
+
+	# Ask user for a new parameters
+	pushl $data_buffer
+	call record_func
+	addl $4, %esp
+
+	# Write buffer into a file on the position of the cursor
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $data_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	pushl $slash_new_slash_line_len
+	pushl $slash_new_slash_line
+	call print_func
+	addl $8, %esp
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call print_func
+	addl $8, %esp
+
+	pushl $slash_new_line_len
+	pushl $slash_new_line
+	call print_func
+	addl $8, %esp
+
+	addl $4, %esp
 	jmp waiting_for_user
-	
+
 
 close_ask:
 	cmpl $0, OPENED_FLAG(%ebp)

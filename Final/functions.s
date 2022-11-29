@@ -23,7 +23,7 @@ manual:
 	.ascii "│ change record      │ Changes record in already opened data   │\n"
 	.ascii "│      <file_name>   │ file with a given file_name. Number of  │\n"
 	.ascii "│                    │ the record would be asked after running │\n"
-	.ascii "│                    │ a command                               │\n"
+	.ascii "│                  + │ a command                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ delete record      │ Deletes record in already opened data   │\n"
 	.ascii "│      <file_name>   │ file with a given file_name. Number of  │\n"
@@ -320,7 +320,7 @@ atoi_func:
 
 atoi_loop:
 	# Comparing if current byte is NULL
-	cmpb $0, (%ebx)
+	cmpb $32, (%ebx)
 	# Exit if true
 	je atoi_end
 
@@ -397,7 +397,7 @@ n_records_counter_func:
 	movl $0, %ecx
 	movl $0, %edx
 	int $LINUX_SYSCALL
-	
+
 	jmp n_records_counter_loop
 
 n_records_counter_loop:
