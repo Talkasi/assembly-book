@@ -38,8 +38,18 @@ manual:
 manual_end:
 .equ manual_len, manual_end - manual
 
+# Confirming line block
+confirm_line:
+	.ascii "│ [!]Are you sure you want to delete this line?[Y/n] \0"
+confirm_line_end:
+.equ confirm_line_len, confirm_line_end - confirm_line
 
 # Errors line block
+confirm_line_error:
+	.ascii "\n│ [!]Error. Enter symbol `y` for `yes` or `n` for `no` in any case to continue. \n"
+confirm_line_error_end:
+.equ confirm_line_error_len, confirm_line_error_end - confirm_line_error
+
 create_error_line:
 	.ascii "│\n"
 	.ascii "│ [!]Error. File was not created.\n"
@@ -523,6 +533,8 @@ cpy_str:
 	movl FROM(%esp), %edx
 	movl TO(%esp), %ecx
 
+	jmp cpy_loop
+
 cpy_loop:
 	movb (%edx), %al 
 	movb %al, (%ecx)
@@ -560,3 +572,128 @@ buf_init_end:
 	decl %edx
 	movb $10, (%edx)
 	ret
+
+
+.globl move_func
+.type move_func, @function
+move_func:
+	.equ CURRENT_LINE, 8
+	.equ NEXT_LINE, 4
+	movl CURRENT_LINE(%esp), %ecx 
+	movl NEXT_LINE(%esp), %edx 
+
+	# %ecx stores address of the first character in current_line
+	# %edx stores address of the first character in next_line
+	# First $ID_LEN characters store ID, start moving from $ID_LEN + 1
+	add $CAR_MODEL_POSITION, %ecx 
+	add $CAR_MODEL_POSITION, %edx
+	jmp move_loop
+
+move_loop:
+	movl $0, %eax
+
+	movb (%edx), %al
+	movb %al, (%ecx)
+
+	cmpb $10, %al
+	je move_end
+
+	inc %ecx 
+	inc %edx 
+	jmp move_loop
+
+move_end:
+	ret
+
+.globl confirm_func
+.type confirm_func, @function
+confirm_func:
+	movl 8(%esp), %ecx # <- Data_size
+	movl 4(%esp), %edx # <- Data_buffer
+
+	pushl $confirm_line_len
+	pushl $confirm_line
+	call print_func
+	addl $8, %esp 
+
+	movl 8(%esp), %ecx # <- Data_size
+	movl 4(%esp), %edx # <- Data_buffer
+
+	pushl %ecx
+	pushl %edx
+	call scan_func
+	addl $8, %esp
+
+	movl 8(%esp), %ecx # <- Data_size
+	movl 4(%esp), %edx # <- Data_buffer
+
+	# Yes block
+	movl $0, %eax
+	movl $0, %ecx
+	# If first character is Y then %al == 0
+	movb (%edx), %al
+	xor $89, %al
+
+	# If first character is y then %cl == 0
+	movb (%edx), %cl
+	xor $121, %cl
+
+	# If %cl == 0 or %al == 0 then %al == 0
+	and %cl, %al
+
+	# %al now is 0 if y or Y was on the first place
+	# Check the second place
+	inc %edx
+	# If second character is `\n` then %cl == 0
+	movb (%edx), %cl
+	xor $10, %cl
+
+	# %al is 0 if 'y\n' or 'Y\n'
+	or %cl, %al
+
+	cmpb $0, %al
+	je confirm_end_true
+
+	dec %edx
+
+	# No block
+	movl $0, %eax
+	movl $0, %ecx
+	# If first character is N then %al == 0
+	movb (%edx), %al
+	xor $78, %al
+
+	# If first character is n then %cl == 0
+	movb (%edx), %cl
+	xor $110, %cl
+	
+	# If %cl == 0 or %al == 0 then %al == 0
+	and %cl, %al
+
+	# %al now is 0 if n or N was on the first place
+	# Check the second place
+	inc %edx
+	# If second character is `\n` then %cl == 0
+	movb (%edx), %cl
+	xor $10, %cl
+
+	# %al is 1 if 'n\n' or 'N\n'
+	or %cl, %al
+
+	cmpb $0, %al
+	je confirm_end_false
+
+	pushl $confirm_line_error_len
+	pushl $confirm_line_error
+	call print_func
+	addl $8, %esp 
+
+	jmp confirm_func
+
+confirm_end_true:
+	movl $1, %eax
+	ret 
+
+confirm_end_false:
+	movl $0, %eax
+	ret 

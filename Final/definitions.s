@@ -8,6 +8,7 @@
 .equ SYS_CREATE, 8
 .equ SYS_LSEEK, 19
 .equ SYS_BRK, 45
+.equ SYS_FTRUNCATE, 93
 
 #System Call Interrupt Number
 .equ LINUX_SYSCALL, 0x80

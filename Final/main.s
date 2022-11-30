@@ -49,6 +49,9 @@ add_record_command:
 change_record_command:
 	.ascii "change record \0"
 
+delete_record_command:
+	.ascii "delete record \0"
+
 open_command:
 	.ascii "open \0"
 
@@ -78,6 +81,8 @@ slash_line:
 slash_line_end:
 .equ slash_line_len, slash_line_end - slash_line
 
+end_of_line:
+	.ascii "\0"
 
 # Errors line block
 command_error_line:
@@ -115,7 +120,7 @@ itoa_error_line_end:
 
 close_error_line:
 	.ascii "│\n"
-	.ascii "│ [!]Error. File was not closed.\n"
+	.ascii "│ [!]Error. File wasn't closed because it wasn't opened.\n"
 	.ascii "│ - Only opened files can be closed\n"
 	.ascii "│\n"
 close_error_line_end:
@@ -135,15 +140,27 @@ change_record_error_line:
 change_record_error_line_end:
 .equ change_record_error_line_len, change_record_error_line_end - change_record_error_line
 
+delete_record_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. The record you want to delete doesn't exist.\n"
+	.ascii "│\n"
+delete_record_error_line_end:
+.equ delete_record_error_line_len, delete_record_error_line_end - delete_record_error_line
+
 number_ask_line:
 	.ascii "│\n"
 	.ascii "│ Enter number of the record should be changed: "
 number_ask_line_end:
 .equ number_ask_line_len, number_ask_line_end - number_ask_line
 
+number_ask_delete_line:
+	.ascii "│\n"
+	.ascii "│ Enter number of the record should be deleted: "
+number_ask_delete_line_end:
+.equ number_ask_delete_line_len, number_ask_delete_line_end - number_ask_delete_line
 
 # Buffers block
-.equ RECORD_SIZE, 100
+.equ RECORD_SIZE, 130
 .equ DATA_SIZE, 130
 .equ OPENED_FILE_NAME_SIZE, 50
 .section .bss
@@ -244,6 +261,16 @@ waiting_for_user:
 
 	cmpl $1, %eax
 	je change_record_ask
+
+	# Change record check, comparing + file_name existance check
+	pushl $1
+	pushl $delete_record_command
+	pushl $record_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	je delete_record_ask
 
 	# Open file check, comparing + file_name existance check
 	pushl $1
@@ -468,6 +495,23 @@ add_record_ask:
 
 
 change_record_ask:
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
+
+	pushl $0
+	pushl $record_buffer + 14
+	pushl $opened_file_name_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	jne not_opened_error
+
+	cmpl $0, OPENED_FLAG(%ebp)
+	je not_opened_error
+
 	pushl $number_ask_line_len
 	pushl $number_ask_line
 	call print_func
@@ -564,6 +608,190 @@ change_record_ask:
 	addl $4, %esp
 	jmp waiting_for_user
 
+delete_record_ask:
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
+
+	pushl $0
+	pushl $record_buffer + 14
+	pushl $opened_file_name_buffer
+	call cmp_str
+	addl $12, %esp
+
+	cmpl $1, %eax
+	jne not_opened_error
+
+	cmpl $0, OPENED_FLAG(%ebp)
+	je not_opened_error
+
+	# Push line asking user about number of the record should be deleted
+	pushl $number_ask_delete_line_len
+	pushl $number_ask_delete_line
+	call print_func
+	addl $8, %esp 
+
+	# Initialize buffer with spaces
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp 
+
+	# Scan number of record should be deleted
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call scan_func
+	addl $8, %esp
+
+	# Delete '\n' from the end of the number
+	movl $32, data_buffer - 1(%eax)
+
+	# Convert string to integer
+	pushl %eax
+	pushl $data_buffer
+	call atoi_func
+	addl $4, %esp
+	# %eax stores # of the record user wants to delete
+	pushl %eax
+
+	# Count number of records exist
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	pushl DESCRIPTOR_POSITION(%ebp)
+	call n_records_counter_func
+	addl $12, %esp
+
+	# %eax stores last record number exist
+	# If record should be deleted doesn't exist through an error
+	cmpl (%esp), %eax
+	jl delete_record_error
+	cmpl $1, (%esp)
+	jl delete_record_error
+
+	# Make %eax store position of the cursor
+	decl (%esp)
+	movl $DATA_SIZE, %eax
+	movl (%esp), %ecx
+	mul %ecx
+
+	# Value of the number of record user wants to delete is now useless
+	addl $4, %esp
+
+	# push current cursor position to the stack
+	pushl %eax
+
+	# Set cursor to the found position
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl %eax, %ecx
+	movl $SYS_LSEEK, %eax
+	movl $0, %edx
+	int $LINUX_SYSCALL
+
+	# Read current data line to the record buffer
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $record_buffer, %ecx
+	movl $RECORD_SIZE, %edx
+	movl $SYS_READ, %eax
+	int $LINUX_SYSCALL
+
+	pushl $slash_new_slash_line_len
+	pushl $slash_new_slash_line
+	call print_func
+	addl $8, %esp
+
+	pushl $RECORD_SIZE
+	pushl $record_buffer
+	call print_func
+	addl $8, %esp
+
+	pushl $slash_new_line_len
+	pushl $slash_new_line
+	call print_func
+	addl $8, %esp
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call confirm_func
+	addl $8, %esp
+
+	cmpl $0, %eax
+	je mistake_appears
+
+	# Set cursor to the found position
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl (%esp), %ecx
+	movl $SYS_LSEEK, %eax
+	movl $0, %edx
+	int $LINUX_SYSCALL
+
+	jmp delete_record_loop
+
+delete_record_loop:
+	# Read current data line to the record buffer
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $record_buffer, %ecx
+	movl $RECORD_SIZE, %edx
+	movl $SYS_READ, %eax
+	int $LINUX_SYSCALL
+
+	# Read next data line to the data buffer
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $data_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	movl $SYS_READ, %eax
+	int $LINUX_SYSCALL
+
+	cmp $0, %eax
+	je delete_record_end
+
+	# Set cursor to the position of the current data line 
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl (%esp), %ecx
+	movl $SYS_LSEEK, %eax
+	movl $0, %edx
+	int $LINUX_SYSCALL
+
+	# Copy next data line with the number of previous data line
+	pushl $record_buffer
+	pushl $data_buffer
+	call move_func
+	addl $8, %esp
+
+	# Write buffer into a file on a position of the cursor
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $record_buffer, %ecx
+	movl $DATA_SIZE, %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	# Add DATA_SIZE to the current position of the cusror in the stack
+	addl $DATA_SIZE, (%esp)
+
+	jmp delete_record_loop
+
+delete_record_end:
+	pushl $slash_new_line_len
+	pushl $slash_new_line
+	call print_func
+	addl $8, %esp
+
+	movl $SYS_FTRUNCATE, %eax
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl (%esp), %ecx
+	int $LINUX_SYSCALL
+
+	addl $4, %esp
+	jmp waiting_for_user
+
+mistake_appears:
+	pushl $slash_new_line_len
+	pushl $slash_new_line
+	call print_func
+	addl $8, %esp
+	
+	addl $4, %esp
+	jmp waiting_for_user
 
 close_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
@@ -640,6 +868,14 @@ itoa_error:
 change_record_error:
 	pushl $change_record_error_line_len
 	pushl $change_record_error_line
+	call print_func
+	addl $8, %esp
+
+	jmp waiting_for_user
+
+delete_record_error:
+	pushl $delete_record_error_line_len
+	pushl $delete_record_error_line
 	call print_func
 	addl $8, %esp
 
