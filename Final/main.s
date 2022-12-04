@@ -938,8 +938,13 @@ close_ask:
 
 exit_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
-	jne not_closed_error
+	je exit_end
 
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $SYS_CLOSE, %eax
+	int $LINUX_SYSCALL
+
+exit_end:
 	pushl $exit_line_len
 	pushl $exit_line
 	call print_func

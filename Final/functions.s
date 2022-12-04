@@ -40,7 +40,7 @@ manual_end:
 
 # Confirming line block
 confirm_line:
-	.ascii "│ [!]Are you sure you want to delete this line?[Y/n] \0"
+	.ascii "│ [!]Are you sure you want to delete this line?[y/n] \0"
 confirm_line_end:
 .equ confirm_line_len, confirm_line_end - confirm_line
 
