@@ -168,9 +168,15 @@ ask_password_line:
 ask_password_line_end:
 .equ ask_password_line_len, ask_password_line_end - ask_password_line
 
+password_correct_line:
+	.ascii "│\n"
+	.ascii "│ Password is correct. File was successfully opened, commands are available. \n"
+password_correct_line_end:
+.equ password_correct_line_len, password_correct_line_end - password_correct_line
+
 password_error_line:
 	.ascii "│\n"
-	.ascii "│ [!]Error. Wrong password.\n"
+	.ascii "│ [!]Access denied. Wrong password.\n"
 	.ascii "│\n"
 password_error_line_end:
 .equ password_error_line_len, password_error_line_end - password_error_line
@@ -432,6 +438,11 @@ open_ask:
 
 	cmpl $1, %eax
 	jne password_error
+
+	pushl $password_correct_line_len
+	pushl $password_correct_line
+	call print_func
+	addl $8, %esp 
 
 	pushl $slash_new_line_len
 	pushl $slash_new_line
