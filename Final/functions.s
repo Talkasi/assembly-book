@@ -114,6 +114,7 @@ owner_line_end:
 
 .globl print_man
 .type print_man, @function
+# Prints manual
 print_man:
 	movl $STDOUT, %ebx
 	movl $manual, %ecx
@@ -126,6 +127,11 @@ print_man:
 
 .globl create_func
 .type create_func, @function
+# Creates a file and set the password to it
+
+# First parameter from the stack is name of a file to create
+# Second parameter from the stack is a data_buffer
+# Third parameter from the stack is a size of a data_buffer
 create_func:
 	movl $SYS_OPEN, %eax
 	movl 4(%esp), %ebx
@@ -231,13 +237,6 @@ create_password:
 	call itoa_func
 	addl $16, %esp
 
-	// movl 12(%esp), %ecx
-	// movl 8(%esp), %edx
-	// pushl %ecx 
-	// pushl %edx
-	// call print_func
-	// addl $8, %esp
-
 	# Open the file
 	movl $SYS_OPEN, %eax
 	movl 4(%esp), %ebx
@@ -292,6 +291,12 @@ create_exit:
 
 .globl hash_func
 .type hash_func, @function
+# Compute hash of a string
+
+# Frist parameter from a string is data_buffer
+# Second parameter from a string is a size of a bata_buffer
+
+# returns hash of the given string
 hash_func:
 	.equ SIZE, 8
 	.equ BUFFER, 4
@@ -328,8 +333,12 @@ hash_end:
 
 .globl itoa_func
 .type itoa_func, @function
+# Convertes integer-number to a string and writes it on the position of the records number
+
 # %edi stores position in data_buffer where answer should be start written
 # %esi stores number of symbols were written
+
+# returns 0 if error occured, 1 if not
 itoa_func:
 	.equ NUMBER, 4
 	.equ DATA, 8
@@ -376,8 +385,14 @@ itoa_end_wrong:
 
 .globl atoi_func
 .type atoi_func, @function
+# Convertes string with an integer to a number
+
+# First parameter from the stack is a buffer with a string
+# Second parameter from the stack is a size of a buffer with a string
+
+# returns number recieved from the string
 atoi_func:
-	# Store given_string_start_position in the %ebx. Expecting string is a null-terminated number
+	# Store given_string_start_position in the %ebx. Expecting string is a null-terminated integer
 	.equ LEN, 8
 	.equ BUFF, 4
 	movl LEN(%esp), %esi
@@ -437,14 +452,13 @@ atoi_end:
 	ret
 
 
-
 .globl n_records_counter_func
 .type n_records_counter_func, @function
 # Computes number of records stored in data base
 
-# First parameter in the stack is file descriptor
-# Second parameter in the stack is buffer to read in
-# Third parameter in the stack is size of a buffer
+# First parameter from the stack is file descriptor
+# Second parameter from the stack is buffer to read in
+# Third parameter from the stack is size of a buffer
 
 # %esi stores an answer
 
@@ -496,6 +510,8 @@ end_counter_func:
 
 .globl record_func 
 .type record_func, @function
+# Asks user about all needed parameters for a record and saves answers to a given buffer
+# First parameter from the stack is a buffer
 record_func:
 	pushl %ebp
 	movl %esp, %ebp
@@ -508,8 +524,6 @@ record_func:
 	call print_func
 	addl $8, %esp
 
-	#	data_buffer		ret_addr	ebp		esp
-
 	# Write car model into a data buffer
 	pushl $CAR_MODEL_LEN
 	addl $CAR_MODEL_POSITION, DATA(%ebp)
@@ -521,7 +535,6 @@ record_func:
 	decl DATA(%ebp)
 	movl DATA(%ebp), %eax
 	movb $32, (%eax)
-
 
 	# Ask for a licence plate
 	pushl $license_plate_line_len
@@ -587,6 +600,10 @@ record_func:
 
 .globl buf_init
 .type buf_init, @function
+# Initializes buffer with spaces and '\n' in the end
+
+# First parameter from the stack is given buffer
+# Second parameter from the stack is size of a given buffer
 buf_init:
 	.equ SIZE_ADDRESS, 8
 	.equ BUFF_ADDRESS, 4
@@ -612,15 +629,17 @@ buf_init_end:
 
 .globl move_func
 .type move_func, @function
+# Copies a string from the sourse string starting with the car_model_position
+
+# %ecx stores address of the first character in current_line
+# %edx stores address of the first character in next_line
+# First $ID_LEN characters store ID, start moving from $ID_LEN + 1
 move_func:
 	.equ CURRENT_LINE, 8
 	.equ NEXT_LINE, 4
 	movl CURRENT_LINE(%esp), %ecx 
 	movl NEXT_LINE(%esp), %edx 
 
-	# %ecx stores address of the first character in current_line
-	# %edx stores address of the first character in next_line
-	# First $ID_LEN characters store ID, start moving from $ID_LEN + 1
 	add $CAR_MODEL_POSITION, %ecx 
 	add $CAR_MODEL_POSITION, %edx
 	jmp move_loop
@@ -644,6 +663,12 @@ move_end:
 
 .globl confirm_func
 .type confirm_func, @function
+# Asks if chosen record should be deleted or not
+
+# First parameter from the stack is a size of a buffer to save confirming answer
+# Second parameter from the stack is a buffer to save confirming answer
+
+# returns 1 if users answer is yes, 0 if no
 confirm_func:
 	movl 8(%esp), %ecx # <- Data_size
 	movl 4(%esp), %edx # <- Data_buffer

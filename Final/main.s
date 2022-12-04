@@ -380,11 +380,6 @@ open_ask:
 
 	movl $0, record_buffer - 1(%eax)
 
-	// pushl $RECORD_SIZE
-	// pushl $record_buffer
-	// call print_func
-	// addl $8, %esp 
-
 	pushl $DATA_SIZE
 	pushl $data_buffer
 	call buf_init
@@ -428,11 +423,6 @@ open_ask:
 
 	movl $DATA_SIZE, %eax
 	movl $0, data_buffer - 1(%eax)
-
-	// pushl $DATA_SIZE
-	// pushl $data_buffer
-	// call print_func
-	// addl $8, %esp 
 
 	pushl $0
 	pushl $record_buffer
@@ -550,17 +540,6 @@ add_record_ask:
 	call buf_init
 	addl $8, %esp
 
-	// movl DESCRIPTOR_POSITION(%ebp), %ebx
-	// movl $SYS_LSEEK, %eax
-	// movl $0, %ecx
-	// movl $2, %edx
-	// int $LINUX_SYSCALL
-
-	// movl $0, %edx
-	// movl $DATA_SIZE, %ecx
-	// div %ecx
-	// incl %eax
-
 	pushl $DATA_SIZE
 	pushl $data_buffer
 	pushl DESCRIPTOR_POSITION(%ebp)
@@ -671,7 +650,6 @@ change_record_ask:
 	jl change_record_error
 
 	# Make %eax store position of the cursor
-	//decl (%esp)
 	movl $DATA_SIZE, %eax
 	movl (%esp), %ecx
 	mul %ecx
@@ -786,14 +764,13 @@ delete_record_ask:
 	addl $12, %esp
 
 	# %eax stores last record number exist
-	# If record should be deleted doesn't exist through an error
+	# If record should be deleted doesn't exist throw an error
 	cmpl (%esp), %eax
 	jl delete_record_error
 	cmpl $1, (%esp)
 	jl delete_record_error
 
 	# Make %eax store position of the cursor
-	//decl (%esp)
 	movl $DATA_SIZE, %eax
 	movl (%esp), %ecx
 	mul %ecx
