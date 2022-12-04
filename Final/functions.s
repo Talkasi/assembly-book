@@ -28,7 +28,7 @@ manual:
 	.ascii "│ delete record      │ Deletes record in already opened data   │\n"
 	.ascii "│      <file_name>   │ file with a given file_name. Number of  │\n"
 	.ascii "│                    │ the record would be asked after running │\n"
-	.ascii "│                    │ a command                               │\n"
+	.ascii "│                  + │ a command                               │\n"
 	.ascii "├────────────────────┼─────────────────────────────────────────┤\n"
 	.ascii "│ close <file_name>  │ Close opend data file with a given      │\n"
 	.ascii "│                  + │ file_name                               │\n"
@@ -44,7 +44,25 @@ confirm_line:
 confirm_line_end:
 .equ confirm_line_len, confirm_line_end - confirm_line
 
+password_line:
+	.ascii "│\n"
+	.ascii "│ Set password to a file: "
+password_line_end:
+.equ password_line_len, password_line_end - password_line
+
+password_confirm_line:
+	.ascii "│\n"
+	.ascii "│ Repeat the password: "
+password_confirm_line_end:
+.equ password_confirm_line_len, password_confirm_line_end - password_confirm_line
+
 # Errors line block
+create_password_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. Passwords aren't simulare. Try again.\n"
+create_password_error_line_end:
+.equ create_password_error_line_len, create_password_error_line_end - create_password_error_line
+
 confirm_line_error:
 	.ascii "\n│ [!]Error. Enter symbol `y` for `yes` or `n` for `no` in any case to continue. \n"
 confirm_line_error_end:
@@ -57,47 +75,6 @@ create_error_line:
 	.ascii "│\n"
 create_error_line_end:
 .equ create_error_line_len, create_error_line_end - create_error_line
-
-command_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. TasIApp doesn't support this command.\n"
-	.ascii "│\n"
-	.ascii "│ Here is a list of all commands supported:\n"
-command_error_line_end:
-.equ command_error_line_len, command_error_line_end - command_error_line
-
-open_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. File was not opened.\n"
-	.ascii "│ - You should create file before open it.\n"
-	.ascii "│ - Only one file can be opened at a time.\n"
-	.ascii "│ Close the file you're working with to open another one.\n"
-	.ascii "│\n"
-open_error_line_end:
-.equ open_error_line_len, open_error_line_end - open_error_line
-
-not_opened_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. File was not opened.\n"
-	.ascii "│ - You should open file before dealing with it.\n"
-	.ascii "│\n"
-not_opened_error_line_end:
-.equ not_opened_error_line_len, not_opened_error_line_end - not_opened_error_line
-
-close_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. File was not closed.\n"
-	.ascii "│ - Only opened files can be closed\n"
-	.ascii "│\n"
-close_error_line_end:
-.equ close_error_line_len, close_error_line_end - close_error_line
-
-not_closed_error_line:
-	.ascii "│\n"
-	.ascii "│ [!]Error. Close opened file to exit TasIApp.\n"
-	.ascii "│\n"
-not_closed_error_line_end:
-.equ not_closed_error_line_len, not_closed_error_line_end - not_closed_error_line
 
 # Add record line block
 car_model_line:
@@ -147,57 +124,6 @@ print_man:
 	ret
 
 
-.globl cmp_str
-.type cmp_str, @function
-cmp_str:
-	.equ BUFF_ADDRESS, 4
-	.equ MAN_ADDRESS, 8
-	.equ MODE_ADDRESS, 12
-	movl BUFF_ADDRESS(%esp), %edx
-	movl MAN_ADDRESS(%esp), %ecx
-	movl MODE_ADDRESS(%esp), %esi
-	movl $0, %edi
-
-cmp_loop:
-	movb (%ecx), %bl
-	cmpb $0, %bl
-	je end_buff
-
-	movb (%edx), %al
-	movb (%ecx), %bl
-	cmpb %al, %bl
-	jne cmp_exit
-
-	incl %edx
-	incl %ecx
-	jmp cmp_loop
-
-end_buff:
-	movb (%edx), %al
-	movb (%ecx), %bl
-	cmpb %al, %bl
-	jne cmp_status_exit
-
-	decl %edx
-	movb (%edx), %al
-	cmpb $32, %al 
-	je cmp_exit
-
-	movl $1, %edi
-	jmp cmp_exit
-
-cmp_status_exit:
-	cmpl $0, %esi 
-	je cmp_exit
-
-	movl $1, %edi
-	jmp cmp_exit
-
-cmp_exit:
-	movl %edi, %eax
-	ret	
-
-
 .globl create_func
 .type create_func, @function
 create_func:
@@ -215,7 +141,139 @@ create_func:
 	movl $0777, %ecx
 	int $LINUX_SYSCALL
 
+	jmp create_password
+
+create_password:
+	pushl $password_line_len
+	pushl $password_line
+	call print_func
+	addl $8, %esp
+
+	movl 12(%esp), %ecx
+	movl 8(%esp), %edx
+
+	pushl %ecx 
+	pushl %edx
+	call buf_init
+	addl $8, %esp
+
+	movl 12(%esp), %ecx
+	movl 8(%esp), %edx
+
+	pushl %ecx 
+	pushl %edx
+	call scan_func
+	addl $8, %esp
+
+	movl 12(%esp), %ecx
+	movl 8(%esp), %edx
+
+	pushl %eax
+	pushl %edx
+	call hash_func
+	addl $8, %esp 
+
+	# Store hash value
+	pushl %eax
+
+	movl 16(%esp), %ecx
+	movl 12(%esp), %edx
+
+	pushl $password_confirm_line_len
+	pushl $password_confirm_line
+	call print_func
+	addl $8, %esp
+
+	movl 16(%esp), %ecx
+	movl 12(%esp), %edx
+
+	pushl %ecx 
+	pushl %edx
+	call buf_init
+	addl $8, %esp
+
+	movl 16(%esp), %ecx
+	movl 12(%esp), %edx
+
+	pushl %ecx 
+	pushl %edx
+	call scan_func
+	addl $8, %esp
+
+	movl 16(%esp), %ecx
+	movl 12(%esp), %edx
+
+	pushl %eax
+	pushl %edx
+	call hash_func
+	addl $8, %esp 
+
+	cmp (%esp), %eax
+	jne create_password_error
+
+	movl 16(%esp), %ecx
+	movl 12(%esp), %edx
+
+	pushl %ecx 
+	pushl %edx
+	call buf_init
+	addl $8, %esp
+
+	# Make string from a hash number
+	movl 16(%esp), %ecx
+	movl 12(%esp), %edx
+
+	decl %ecx
+	decl %ecx
+	pushl %ecx
+	pushl %edx
+	pushl 8(%esp)
+	call itoa_func
+	addl $16, %esp
+
+	// movl 12(%esp), %ecx
+	// movl 8(%esp), %edx
+	// pushl %ecx 
+	// pushl %edx
+	// call print_func
+	// addl $8, %esp
+
+	# Open the file
+	movl $SYS_OPEN, %eax
+	movl 4(%esp), %ebx
+	movl $2, %ecx
+	movl $0777, %edx
+	int $LINUX_SYSCALL
+
+	# save descriptor 
+	pushl %eax
+
+	# Write string with hash to a file
+	movl %eax, %ebx
+	movl 12(%esp), %ecx
+	movl 16(%esp), %edx
+	movl $SYS_WRITE, %eax
+	int $LINUX_SYSCALL
+
+	# Close the file
+	movl (%esp), %ebx
+	movl $SYS_CLOSE, %eax
+	int $LINUX_SYSCALL
+
+	# Delete descriptor
+	addl $4, %esp
+
 	jmp create_exit
+
+create_password_error:
+	addl $4, %esp
+	# Print error message
+	pushl $create_password_error_line_len
+	pushl $create_password_error_line
+	call print_func
+	addl $8, %esp
+
+	jmp create_password
 
 create_error:
 	# Print error message
@@ -231,59 +289,75 @@ create_exit:
 	movl $1, %eax
 	ret
 
-.equ FIRST_ARG, 4
-.equ SECOND_ARG, 8
 
-.globl print_func
-.type print_func, @function
-print_func:
-	movl $STDOUT, %ebx
-	movl FIRST_ARG(%esp), %ecx 		# line
-	movl SECOND_ARG(%esp), %edx		# len
-	movl $SYS_WRITE, %eax
-	int $LINUX_SYSCALL
+.globl hash_func
+.type hash_func, @function
+hash_func:
+	.equ SIZE, 8
+	.equ BUFFER, 4
 
+	movl SIZE(%esp), %ecx
+	movl BUFFER(%esp), %ebx
+
+	movl $5381, %esi
+	movl $0, %edi
+
+	jmp hash_loop
+
+hash_loop:
+	cmpl SIZE(%esp), %edi
+	jge hash_end
+
+	movl $0, %edx
+	movl $3, %eax
+	mul %esi
+	movl %eax, %esi
+
+	movl $0, %eax
+	movb (%ebx), %al
+	addl %eax, %esi 
+
+	incl %edi
+	incl %ebx
+	jmp hash_loop
+
+hash_end:
+	movl %esi, %eax
 	ret
 
-.globl scan_func
-.type scan_func, @function
-scan_func:
-	movl $STDIN, %ebx
-	movl FIRST_ARG(%esp), %ecx 		# line
-	movl SECOND_ARG(%esp), %edx		# len
-	movl $SYS_READ, %eax
-	int $LINUX_SYSCALL
-
-	ret
 
 .globl itoa_func
 .type itoa_func, @function
+# %edi stores position in data_buffer where answer should be start written
+# %esi stores number of symbols were written
 itoa_func:
-	.equ ID, 4
+	.equ NUMBER, 4
 	.equ DATA, 8
+	.equ POSITION, 12
 	movl DATA(%esp), %edi
-	addl $4, %edi
+	addl POSITION(%esp), %edi
+	incl POSITION(%esp)
 	movl $0, %esi
 
 	jmp itoa_loop 
          
 itoa_loop:
 	movl $0, %edx
-	movl ID(%esp), %eax
+	movl NUMBER(%esp), %eax
 	movl $10, %ecx
 	div %ecx
-	# %eax store ID/10
-	# %edx store ID%10
-	movl %eax, ID(%esp)
+	# %eax store NUMBER/10
+	# %edx store NUMBER%10
+	movl %eax, NUMBER(%esp)
 
 	or %edx, %eax
 	cmp $0, %eax
 	je itoa_end_normal
 
-	cmp $5, %esi
+	cmp POSITION(%esp), %esi
 	je itoa_end_normal
 
-	add $48, %edx 
+	add $48, %edx
 	movb %dl, (%edi)
 
 	incl %esi 
@@ -311,7 +385,7 @@ atoi_func:
 
 	# NULL in the end of the string is not a number to count it in the length of the string
 	dec %esi
-	# There is a number should be multiplying by 10 ** 0, so lwngth - 1 is needed
+	# There is a number should be multiplying by 10 ** 0, so length - 1 is needed
 	dec %esi
 
 	# Compute 10 ** length
@@ -363,74 +437,60 @@ atoi_end:
 	ret
 
 
-.globl power_func
-.type power_func, @function
-# First parameter from the stack is number_given
-# Second parameter from the stack is power_given
-
-# Returns number_given in power of power_given
-power_func:
-	# Stores power
-	movl 8(%esp), %esi
-	# Stores number
-	movl 4(%esp), %ecx
-	# Stores answer
-	movl $1, %edi
-
-	jmp power_loop
-
-power_loop:
-	# If %ebx <= 0 -> break
-	cmpl $0, %esi
-	jle power_end
-
-	# While esi >= 1 do
-	movl %edi, %eax
-	mul %ecx
-	movl %eax, %edi
-
-	dec %esi
-	jmp power_loop
-
-power_end:
-	movl %edi, %eax
-	ret
-
 
 .globl n_records_counter_func
 .type n_records_counter_func, @function
+# Computes number of records stored in data base
+
+# First parameter in the stack is file descriptor
+# Second parameter in the stack is buffer to read in
+# Third parameter in the stack is size of a buffer
+
+# %esi stores an answer
+
+# returns number of records
 n_records_counter_func:
+	.equ DATA_SIZE, 12
+	.equ BUFFER, 8
+	.equ DESCRIPTOR, 4
 	movl $0, %esi
 
-	movl 4(%esp), %ebx
+	# Set cursor to the start of the firs record
+	# (first DATA_SIZE bytes store password's hash)
+	movl DESCRIPTOR(%esp), %ebx
 	movl $SYS_LSEEK, %eax
-	movl $0, %ecx
+	movl DATA_SIZE(%esp), %ecx
 	movl $0, %edx
 	int $LINUX_SYSCALL
 
 	jmp n_records_counter_loop
 
 n_records_counter_loop:
-	movl 4(%esp), %ebx 		# descriptor
+	# Read DATA_SIZE bytes from the file
+	movl DESCRIPTOR(%esp), %ebx 			# descriptor of a file
 	movl $SYS_READ, %eax
-	movl 8(%esp), %ecx 		# start of a buffer
-	movl 12(%esp), %edx		# size of a buffer
+	movl BUFFER(%esp), %ecx 				# start of a buffer
+	movl DATA_SIZE(%esp), %edx				# size of a buffer
 	int $LINUX_SYSCALL
 
-	cmpl $0, %eax 			# %eax stores number of symbols was read from a file
+	# %eax stores number of symbols was read from a file
+	# If zero bytes were read -> end of file was reached
+	cmpl $0, %eax
 	jle end_counter_func
 
-	addl %eax, %esi 		# Count sum of symbols was read from a file
+	# Coumpute sum of symbols were read from a file
+	addl %eax, %esi
 
 	jmp n_records_counter_loop
 
 end_counter_func:
+	# Sum divided by 1 record length is the number of records
 	movl $0, %edx
 	movl %esi, %eax
-	movl 12(%esp), %ecx 	# Sum divided by 1 record length is the number of records
+	movl DATA_SIZE(%esp), %ecx
 	div %ecx
 
-	# Answer is already in %eax
+	# Answer is already in %eax (after division)
 	ret
 
 
@@ -525,30 +585,6 @@ record_func:
 	ret
 
 
-.globl cpy_str
-.type cpy_str, @function
-cpy_str:
-	.equ TO, 4
-	.equ FROM, 8
-	movl FROM(%esp), %edx
-	movl TO(%esp), %ecx
-
-	jmp cpy_loop
-
-cpy_loop:
-	movb (%edx), %al 
-	movb %al, (%ecx)
-
-	cmpb $0, %al
-	je cpy_end
-
-	inc %ecx 
-	inc %edx
-	jmp cpy_loop
-
-cpy_end:
-  	ret
-
 .globl buf_init
 .type buf_init, @function
 buf_init:
@@ -604,6 +640,7 @@ move_loop:
 
 move_end:
 	ret
+
 
 .globl confirm_func
 .type confirm_func, @function

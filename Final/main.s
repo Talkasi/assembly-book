@@ -1,4 +1,6 @@
 .include "definitions.s"
+.include "functions.s"
+.include "standart_functions.s"
 .section .data
 
 # Lines to print block
@@ -18,8 +20,9 @@ ask_user_line_end:
 
 table_information_line:
 	.ascii "├────────┬────────────────────────┬──────────────┬────────┬─────────────────────────────────────────────────────────────────────────┐\n"
-	.ascii "│    #   │       Car model        │   Lisence #  │  Year  │                               Owners name                               │\n"
+	.ascii "│    #   │       Car model        │   Licence #  │  Year  │                               Owners name                               │\n"
 	.asciz "├────────┴────────────────────────┴──────────────┴────────┴─────────────────────────────────────────────────────────────────────────┘\n"
+	.ascii "│ \0"
 table_information_line_end:
 .equ table_information_line_len, table_information_line_end - table_information_line
 
@@ -158,6 +161,19 @@ number_ask_delete_line:
 	.ascii "│ Enter number of the record should be deleted: "
 number_ask_delete_line_end:
 .equ number_ask_delete_line_len, number_ask_delete_line_end - number_ask_delete_line
+
+ask_password_line:
+	.ascii "│\n"
+	.ascii "│ Enter password: "
+ask_password_line_end:
+.equ ask_password_line_len, ask_password_line_end - ask_password_line
+
+password_error_line:
+	.ascii "│\n"
+	.ascii "│ [!]Error. Wrong password.\n"
+	.ascii "│\n"
+password_error_line_end:
+.equ password_error_line_len, password_error_line_end - password_error_line
 
 # Buffers block
 .equ RECORD_SIZE, 130
@@ -309,9 +325,16 @@ man_ask:
 	jmp waiting_for_user 
 
 create_ask:
+	pushl $DATA_SIZE
+	pushl $data_buffer
 	pushl $record_buffer + 7
 	call create_func
-	addl $4, %esp
+	addl $12, %esp
+
+	pushl $slash_new_line_len
+	pushl $slash_new_line
+	call print_func
+	addl $8, %esp 
 
 	jmp waiting_for_user
 
@@ -342,6 +365,104 @@ open_ask:
 	call cpy_str
 	addl $8, %esp
 
+	# Password block
+	# Read first line with password hash
+	pushl $RECORD_SIZE
+	pushl $record_buffer
+	call buf_init
+	addl $8, %esp
+
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $SYS_READ, %eax
+	movl $record_buffer, %ecx
+	movl $RECORD_SIZE, %edx
+	int $LINUX_SYSCALL
+
+	movl $0, record_buffer - 1(%eax)
+
+	// pushl $RECORD_SIZE
+	// pushl $record_buffer
+	// call print_func
+	// addl $8, %esp 
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
+
+	pushl $ask_password_line_len
+	pushl $ask_password_line
+	call print_func
+	addl $8, %esp 
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call scan_func
+	addl $8, %esp
+
+	pushl %eax
+	pushl $data_buffer
+	call hash_func
+	addl $8, %esp
+
+	pushl %eax
+
+	# Make string from a hash number
+	pushl $DATA_SIZE
+	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
+
+	movl $DATA_SIZE, %ecx
+	decl %ecx
+	decl %ecx
+
+	movl (%esp), %eax
+	addl $4, %esp 
+
+	pushl %ecx
+	pushl $data_buffer
+	pushl %eax
+	call itoa_func
+	addl $12, %esp
+
+	movl $DATA_SIZE, %eax
+	movl $0, data_buffer - 1(%eax)
+
+	// pushl $DATA_SIZE
+	// pushl $data_buffer
+	// call print_func
+	// addl $8, %esp 
+
+	pushl $0
+	pushl $record_buffer
+	pushl $data_buffer
+	call cmp_str
+	addl $12, %esp 
+
+	cmpl $1, %eax
+	jne password_error
+
+	pushl $slash_new_line_len
+	pushl $slash_new_line
+	call print_func
+	addl $8, %esp 
+
+	jmp waiting_for_user
+
+password_error:
+	pushl $password_error_line_len
+	pushl $password_error_line
+	call print_func
+	addl $8, %esp
+
+	movl DESCRIPTOR_POSITION(%ebp), %ebx
+	movl $SYS_CLOSE, %eax
+	int $LINUX_SYSCALL
+
+	movl $0, OPENED_FLAG(%ebp)
+	addl $4, %esp
+
 	jmp waiting_for_user
 
 view_ask:
@@ -365,16 +486,11 @@ view_ask:
 	pushl $table_information_line_len
 	pushl $table_information_line
 	call print_func
-	addl $8, %esp 
-
-	pushl $slash_line_len
-	pushl $slash_line
-	call print_func
 	addl $8, %esp
 
 	movl DESCRIPTOR_POSITION(%ebp), %ebx
 	movl $SYS_LSEEK, %eax
-	movl $0, %ecx
+	movl $DATA_SIZE, %ecx
 	movl $0, %edx
 	int $LINUX_SYSCALL
 
@@ -398,7 +514,7 @@ view_ask_loop:
 	pushl $slash_line_len
 	pushl $slash_line
 	call print_func
-	addl $8, %esp 
+	addl $8, %esp
 
 	jmp view_ask_loop
 
@@ -417,12 +533,6 @@ add_record_ask:
 	call buf_init
 	addl $8, %esp
 
-	movl DESCRIPTOR_POSITION(%ebp), %ebx
-	movl $SYS_LSEEK, %eax
-	movl $0, %ecx
-	movl $0, %edx
-	int $LINUX_SYSCALL
-
 	pushl $0
 	pushl $record_buffer + 11
 	pushl $opened_file_name_buffer
@@ -437,30 +547,42 @@ add_record_ask:
 
 	pushl $DATA_SIZE
 	pushl $data_buffer
+	call buf_init
+	addl $8, %esp
+
+	// movl DESCRIPTOR_POSITION(%ebp), %ebx
+	// movl $SYS_LSEEK, %eax
+	// movl $0, %ecx
+	// movl $2, %edx
+	// int $LINUX_SYSCALL
+
+	// movl $0, %edx
+	// movl $DATA_SIZE, %ecx
+	// div %ecx
+	// incl %eax
+
+	pushl $DATA_SIZE
+	pushl $data_buffer
 	pushl DESCRIPTOR_POSITION(%ebp)
 	call n_records_counter_func
 	addl $12, %esp
+
+	incl %eax
+	pushl %eax 
 
 	pushl $DATA_SIZE
 	pushl $data_buffer
 	call buf_init
 	addl $8, %esp
 
-	movl DESCRIPTOR_POSITION(%ebp), %ebx
-	movl $SYS_LSEEK, %eax
-	movl $0, %ecx
-	movl $2, %edx
-	int $LINUX_SYSCALL
+	movl (%esp), %eax 
+	addl $4, %esp
 
-	movl $0, %edx
-	movl $DATA_SIZE, %ecx
-	div %ecx
-	incl %eax
-
+	pushl $4
 	pushl $data_buffer
 	pushl %eax
 	call itoa_func
-	addl $8, %esp
+	addl $12, %esp
 
 	cmpl $0, %eax
 	je itoa_error
@@ -549,7 +671,7 @@ change_record_ask:
 	jl change_record_error
 
 	# Make %eax store position of the cursor
-	decl (%esp)
+	//decl (%esp)
 	movl $DATA_SIZE, %eax
 	movl (%esp), %ecx
 	mul %ecx
@@ -568,11 +690,11 @@ change_record_ask:
 	addl $8, %esp 
 
 	# Write number of the record to a buffer
+	pushl $4
 	pushl $data_buffer
-	addl $1, 4(%esp)
-	pushl 4(%esp)
+	pushl 8(%esp)
 	call itoa_func
-	addl $8, %esp
+	addl $12, %esp
 
 	# Check an error
 	cmpl $0, %eax
@@ -607,6 +729,7 @@ change_record_ask:
 
 	addl $4, %esp
 	jmp waiting_for_user
+
 
 delete_record_ask:
 	pushl $DATA_SIZE
@@ -651,7 +774,7 @@ delete_record_ask:
 	pushl %eax
 	pushl $data_buffer
 	call atoi_func
-	addl $4, %esp
+	addl $8, %esp
 	# %eax stores # of the record user wants to delete
 	pushl %eax
 
@@ -670,7 +793,7 @@ delete_record_ask:
 	jl delete_record_error
 
 	# Make %eax store position of the cursor
-	decl (%esp)
+	//decl (%esp)
 	movl $DATA_SIZE, %eax
 	movl (%esp), %ecx
 	mul %ecx
@@ -784,6 +907,7 @@ delete_record_end:
 	addl $4, %esp
 	jmp waiting_for_user
 
+
 mistake_appears:
 	pushl $slash_new_line_len
 	pushl $slash_new_line
@@ -792,6 +916,7 @@ mistake_appears:
 	
 	addl $4, %esp
 	jmp waiting_for_user
+
 
 close_ask:
 	cmpl $0, OPENED_FLAG(%ebp)
